@@ -3,10 +3,20 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "nodemon",
     "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "cert": "mkdir -p nginx-certs && HOST=$(grep '^BACKEND_HOST' .env.local | cut -d= -f2) && mkcert -install && mkcert -key-file nginx-certs/$HOST.key -cert-file nginx-certs/$HOST.crt $HOST localhost 127.0.0.1 ::1"
   },
   "dependencies": {
@@ -14,6 +24,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.5.2",
+    "helmet": "^8.0.0",
     "ioredis": "^5.4.1",
     "pg": "^8.13.0",
     "reflect-metadata": "^0.2.2",
@@ -22,14 +33,20 @@
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
     "@types/node": "^22.0.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.6",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
     "nodemon": "^3.1.0",
+    "prettier": "^3.4.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.15.0",
+    "vitest": "^2.1.0"
   },
   "private": true,
   "nodemonConfig": {

@@ -3,15 +3,24 @@ import { AppDataSource } from '../../config/database';
 import { redis } from '../../config/redis';
 
 export async function healthCheck(_req: Request, res: Response): Promise<void> {
-  let redisOk = false;
+  let dbOk = false;
   try {
-    await redis.ping();
-    redisOk = true;
+    if (AppDataSource.isInitialized) {
+      await AppDataSource.query('SELECT 1');
+      dbOk = true;
+    }
   } catch {}
 
-  res.json({
-    status: 'ok',
-    db: AppDataSource.isInitialized,
+  let redisOk = false;
+  try {
+    const pong = await redis.ping();
+    redisOk = pong === 'PONG';
+  } catch {}
+
+  const ok = dbOk && redisOk;
+  res.status(ok ? 200 : 503).json({
+    status: ok ? 'ok' : 'degraded',
+    db: dbOk,
     redis: redisOk,
   });
 }
