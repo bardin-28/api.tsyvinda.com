@@ -9,8 +9,7 @@ COPY . .
 CMD ["npm", "run", "dev"]
 
 FROM base AS builder
-ENV NODE_ENV=production
-RUN npm ci
+RUN npm ci --include=dev
 COPY . .
 RUN npm run build
 
