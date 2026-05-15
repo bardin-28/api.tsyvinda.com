@@ -15,7 +15,9 @@ app.disable('x-powered-by');
 
 app.use(helmet());
 app.use(cors({ origin: config.frontendHost || false }));
-app.use(rateLimit({ windowMs: 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false }));
+app.use(
+  rateLimit({ windowMs: 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false }),
+);
 app.use(express.json({ limit: '1mb' }));
 
 app.use(

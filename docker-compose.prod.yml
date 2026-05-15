@@ -12,8 +12,8 @@ volumes:
 x-logging: &default-logging
   driver: json-file
   options:
-    max-size: "10m"
-    max-file: "5"
+    max-size: '10m'
+    max-file: '5'
 
 services:
   nginx-proxy:
@@ -25,10 +25,10 @@ services:
         - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD}
         - BASIC_AUTH_HOST=${BACKEND_HOST}
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     labels:
-      - "com.github.nginx-proxy.nginx"
+      - 'com.github.nginx-proxy.nginx'
     hostname: ${COMPOSE_PROJECT_NAME}-nginx-proxy
     restart: unless-stopped
     logging: *default-logging
@@ -99,12 +99,14 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - '127.0.0.1:5432:5432'
     volumes:
       - postgres-data:/var/lib/postgresql
     networks:
       - app-backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -118,7 +120,7 @@ services:
     networks:
       - app-backend
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
