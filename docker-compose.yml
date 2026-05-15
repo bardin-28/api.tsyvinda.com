@@ -1,0 +1,90 @@
+version: '3.8'
+
+networks:
+  app-backend:
+    driver: bridge
+
+volumes:
+  nginx-html:
+  nginx-vhost:
+  postgres-data:
+  redis-data:
+
+services:
+  nginx-proxy:
+    build:
+      context: ./docker/nginx-proxy
+      args:
+        - BASIC_AUTH=false
+        - BASIC_AUTH_HOST=${BACKEND_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+    labels:
+      - "com.github.nginx-proxy.nginx"
+    hostname: ${COMPOSE_PROJECT_NAME}-nginx-proxy
+    restart: ${RESTART_POLICY}
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./nginx-certs:/etc/nginx/certs
+      - nginx-html:/usr/share/nginx/html
+      - nginx-vhost:/etc/nginx/vhost.d
+      - ./docker/nginx-proxy/custom.conf:/etc/nginx/conf.d/custom.conf:ro
+    networks:
+      - app-backend
+
+  app:
+    build:
+      context: .
+      target: development
+    hostname: ${COMPOSE_PROJECT_NAME}-app
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - BACKEND_HOST=${BACKEND_HOST}
+      - FRONTEND_HOST=${FRONTEND_HOST}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - VIRTUAL_HOST=${BACKEND_HOST}
+      - VIRTUAL_PORT=3000
+    volumes:
+      - ./src:/app/src
+    networks:
+      - app-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
