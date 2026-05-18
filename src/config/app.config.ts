@@ -20,7 +20,6 @@ export const config = {
 export function assertConfig(): void {
   const missing: string[] = [];
   if (!config.db.url) missing.push('DATABASE_URL');
-  if (!config.frontendHost) missing.push('FRONTEND_HOST');
   if (missing.length) {
     throw new Error(`Missing required env vars: ${missing.join(', ')}`);
   }

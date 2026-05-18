@@ -9,13 +9,17 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
       await AppDataSource.query('SELECT 1');
       dbOk = true;
     }
-  } catch {}
+  } catch (err) {
+    console.warn('health: db check failed', err);
+  }
 
   let redisOk = false;
   try {
     const pong = await redis.ping();
     redisOk = pong === 'PONG';
-  } catch {}
+  } catch (err) {
+    console.warn('health: redis check failed', err);
+  }
 
   const ok = dbOk && redisOk;
   res.status(ok ? 200 : 503).json({

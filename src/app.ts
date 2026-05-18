@@ -7,6 +7,8 @@ import swaggerUi from 'swagger-ui-express';
 import { config } from './config/app.config';
 import { swaggerSpec } from './config/swagger';
 import healthRouter from './modules/health/health.routes';
+import { notFound } from './shared/not-found';
+import { errorHandler } from './shared/error-handler';
 
 const app = express();
 
@@ -27,5 +29,8 @@ app.use(
   swaggerUi.setup(swaggerSpec),
 );
 app.use('/health', healthRouter);
+
+app.use(notFound);
+app.use(errorHandler);
 
 export default app;

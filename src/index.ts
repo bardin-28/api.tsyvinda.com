@@ -5,6 +5,8 @@ import { config, assertConfig } from './config/app.config';
 import { AppDataSource } from './config/database';
 import { redis } from './config/redis';
 
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+
 async function init(): Promise<void> {
   assertConfig();
 
@@ -23,14 +25,26 @@ async function init(): Promise<void> {
 
   const shutdown = async (signal: string): Promise<void> => {
     console.log(`${signal} received, shutting down`);
-    server.close();
+
+    const forceExit = setTimeout(() => {
+      console.error('Forced exit after shutdown timeout');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    forceExit.unref();
+
     try {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
       await AppDataSource.destroy();
-      redis.disconnect();
+      await redis.quit();
+      clearTimeout(forceExit);
+      process.exit(0);
     } catch (err) {
       console.error('Shutdown error:', err);
+      clearTimeout(forceExit);
+      process.exit(1);
     }
-    process.exit(0);
   };
 
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
