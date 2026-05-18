@@ -49,7 +49,7 @@ Harden the backend boilerplate (Express 4 + TypeORM + ioredis) for production: f
 - **Step 8** — Relax `assertConfig`: `FRONTEND_HOST` no longer required, only `DATABASE_URL`. CORS handles empty case via `origin: false`.
 - **Step 9** — Vitest: add `src/shared/error-handler.test.ts` (mounts `errorHandler` on a stub app, asserts JSON shape + status mapping).
 
-### ⬜ Phase 2 — Observability
+### ✅ Phase 2 — Observability
 
 - **Step 1** — Confirm install: `pino`, `pino-http`. Dev: `pino-pretty`.
 - **Step 2** — Add `src/config/logger.ts` exporting `logger`. Dev: `pino-pretty` transport, level `debug`. Prod: JSON, level `info`. Redact `req.headers.authorization`, `req.headers.cookie`.
@@ -58,7 +58,7 @@ Harden the backend boilerplate (Express 4 + TypeORM + ioredis) for production: f
 - **Step 5** — Error handler logs at `error` level with the request-bound logger (`req.log`); include `requestId` in response body.
 - **Step 6** — Update `/health` JSDoc to document `x-request-id` response header.
 
-### ⬜ Phase 3 — Validation
+### ✅ Phase 3 — Validation
 
 - **Step 1** — Confirm install: `zod`.
 - **Step 2** — Add `src/shared/validate.ts`: `validate({ body?, query?, params? })` middleware returning a `RequestHandler`. On `ZodError`, call `next(new HttpError(400, 'VALIDATION_FAILED', ...))`.
@@ -67,7 +67,7 @@ Harden the backend boilerplate (Express 4 + TypeORM + ioredis) for production: f
 - **Step 5** — Document the validation pattern in CLAUDE.md (one paragraph under "Module pattern").
 - **Step 6** — Vitest: schema unit test for env config (happy + missing `DATABASE_URL`).
 
-### ⬜ Phase 4 — Rate-limit Redis store
+### ✅ Phase 4 — Rate-limit Redis store
 
 - **Step 1** — Confirm install: `rate-limit-redis`.
 - **Step 2** — In `src/app.ts`, replace inline rate-limit with `src/shared/rate-limit.ts` factory using `rate-limit-redis` and the shared `redis` instance.
@@ -75,7 +75,7 @@ Harden the backend boilerplate (Express 4 + TypeORM + ioredis) for production: f
 - **Step 4** — Update README rate-limit section if present.
 - **Step 5** — Vitest: integration test (supertest, added in Phase 5) deferred to Phase 5 final pass.
 
-### ⬜ Phase 5 — Tooling
+### ✅ Phase 5 — Tooling
 
 - **Step 1** — Confirm install: `husky`, `lint-staged`, `supertest`, `@types/supertest`, `globals`, `@vitest/coverage-v8`.
 - **Step 2** — Add `prepare` script: `husky`. Add `.husky/pre-commit` running `npx lint-staged`.
@@ -90,7 +90,7 @@ Harden the backend boilerplate (Express 4 + TypeORM + ioredis) for production: f
 - **Step 8** — Replace `src/app.test.ts` sanity test with a supertest scaffold hitting `/health` (mock `AppDataSource`/`redis`).
 - **Step 9** — Re-run full CI chain locally: `npm run format:check && npm run lint && npm run typecheck && npm run build && npm test`.
 
-### ⬜ Phase 6 — Polish
+### ✅ Phase 6 — Polish
 
 - **Step 1** — `src/app.ts` CORS: parse `config.frontendHost` as `string[]` (comma-separated). Function-form `origin` callback checking inclusion.
 - **Step 2** — `src/config/swagger.ts`: add `components.schemas.Error` matching error middleware payload. Add default 4xx/5xx response refs in JSDoc on `/health`.

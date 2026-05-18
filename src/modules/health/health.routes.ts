@@ -10,6 +10,11 @@ import { healthCheck } from './health.controller';
  *     responses:
  *       200:
  *         description: Service status
+ *         headers:
+ *           x-request-id:
+ *             description: Correlation ID (echoed or generated)
+ *             schema:
+ *               type: string
  *         content:
  *           application/json:
  *             schema:
@@ -21,6 +26,10 @@ import { healthCheck } from './health.controller';
  *                   type: boolean
  *                 redis:
  *                   type: boolean
+ *       503:
+ *         $ref: '#/components/responses/ServiceUnavailable'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
  */
 const router = Router();
 router.get('/', healthCheck);

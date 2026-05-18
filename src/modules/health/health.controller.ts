@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
+import { logger } from '../../config/logger';
 import { redis } from '../../config/redis';
 
 export async function healthCheck(_req: Request, res: Response): Promise<void> {
@@ -10,7 +11,7 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
       dbOk = true;
     }
   } catch (err) {
-    console.warn('health: db check failed', err);
+    logger.warn({ err }, 'health: db check failed');
   }
 
   let redisOk = false;
@@ -18,7 +19,7 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
     const pong = await redis.ping();
     redisOk = pong === 'PONG';
   } catch (err) {
-    console.warn('health: redis check failed', err);
+    logger.warn({ err }, 'health: redis check failed');
   }
 
   const ok = dbOk && redisOk;

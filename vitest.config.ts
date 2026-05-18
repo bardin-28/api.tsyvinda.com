@@ -5,5 +5,16 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts'],
     globals: false,
+    env: {
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgres://test:test@localhost:5432/test',
+      REDIS_URL: 'redis://localhost:6379',
+    },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/index.ts'],
+    },
   },
 });

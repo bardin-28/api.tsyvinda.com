@@ -1,33 +1,32 @@
 import 'dotenv/config';
 import type { Server } from 'http';
 import app from './app';
-import { config, assertConfig } from './config/app.config';
+import { config } from './config/app.config';
 import { AppDataSource } from './config/database';
+import { logger } from './config/logger';
 import { redis } from './config/redis';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 async function init(): Promise<void> {
-  assertConfig();
-
   await AppDataSource.initialize();
-  console.log('Database connected');
+  logger.info('Database connected');
 
-  await redis.connect();
-  console.log('Redis connected');
+  await redis.ping();
+  logger.info('Redis connected');
 
   const server: Server = app.listen(config.port, () => {
-    console.log(`Server listening on port ${config.port}`);
+    logger.info({ port: config.port }, 'Server listening');
     if (config.isDev) {
-      console.log(`Docs → https://${config.backendHost}/docs`);
+      logger.info(`Docs → https://${config.backendHost}/docs`);
     }
   });
 
   const shutdown = async (signal: string): Promise<void> => {
-    console.log(`${signal} received, shutting down`);
+    logger.info({ signal }, 'shutdown received');
 
     const forceExit = setTimeout(() => {
-      console.error('Forced exit after shutdown timeout');
+      logger.error('Forced exit after shutdown timeout');
       process.exit(1);
     }, SHUTDOWN_TIMEOUT_MS);
     forceExit.unref();
@@ -41,7 +40,7 @@ async function init(): Promise<void> {
       clearTimeout(forceExit);
       process.exit(0);
     } catch (err) {
-      console.error('Shutdown error:', err);
+      logger.error({ err }, 'shutdown error');
       clearTimeout(forceExit);
       process.exit(1);
     }
@@ -52,6 +51,6 @@ async function init(): Promise<void> {
 }
 
 init().catch((err) => {
-  console.error('Bootstrap failed:', err);
+  logger.error({ err }, 'Bootstrap failed');
   process.exit(1);
 });

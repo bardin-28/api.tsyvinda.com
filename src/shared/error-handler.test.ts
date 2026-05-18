@@ -49,7 +49,8 @@ describe('errorHandler', () => {
     errorHandler(err, req, res, vi.fn() as NextFunction);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    const payload = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const calls = (res.json as ReturnType<typeof vi.fn>).mock.calls;
+    const payload = calls[0]?.[0];
     expect(payload.error.code).toBe('INTERNAL_ERROR');
     expect(payload.error.requestId).toBeUndefined();
   });
@@ -60,7 +61,8 @@ describe('errorHandler', () => {
     try {
       const res = mockRes();
       errorHandler(new Error('secret'), mockReq(), res, vi.fn() as NextFunction);
-      const payload = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const calls = (res.json as ReturnType<typeof vi.fn>).mock.calls;
+    const payload = calls[0]?.[0];
       expect(payload.error.message).toBe('Internal server error');
     } finally {
       process.env.NODE_ENV = original;
