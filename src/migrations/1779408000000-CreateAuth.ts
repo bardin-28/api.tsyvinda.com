@@ -6,7 +6,7 @@ export class CreateAuth1779408000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE "users" (
-        "id" uuid NOT NULL,
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "firstName" varchar(50) NOT NULL,
         "lastName" varchar(50) NOT NULL,
         "email" varchar(255) NOT NULL,
@@ -22,7 +22,7 @@ export class CreateAuth1779408000000 implements MigrationInterface {
 
     await queryRunner.query(`
       CREATE TABLE "user_identities" (
-        "id" uuid NOT NULL,
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "userId" uuid NOT NULL,
         "provider" varchar(32) NOT NULL,
         "providerUserId" varchar(255) NOT NULL,
@@ -37,7 +37,7 @@ export class CreateAuth1779408000000 implements MigrationInterface {
 
     await queryRunner.query(`
       CREATE TABLE "email_verifications" (
-        "id" uuid NOT NULL,
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "userId" uuid NOT NULL,
         "tokenHash" varchar(64) NOT NULL,
         "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -53,7 +53,7 @@ export class CreateAuth1779408000000 implements MigrationInterface {
 
     await queryRunner.query(`
       CREATE TABLE "refresh_tokens" (
-        "id" uuid NOT NULL,
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "userId" uuid NOT NULL,
         "tokenHash" varchar(64) NOT NULL,
         "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL,
