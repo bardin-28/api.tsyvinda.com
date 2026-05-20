@@ -9,7 +9,7 @@ COPY . .
 CMD ["npm", "run", "dev"]
 
 FROM base AS builder
-RUN npm ci --include=dev
+RUN npm ci --include=dev --ignore-scripts
 COPY . .
 RUN npm run build
 
@@ -18,7 +18,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 RUN apk add --no-cache curl tini
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 USER node
 EXPOSE 3000
