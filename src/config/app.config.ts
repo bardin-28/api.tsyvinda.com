@@ -17,6 +17,13 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
   SSL_KEY_PATH: z.string().default('certs/key.pem'),
   SSL_CERT_PATH: z.string().default('certs/cert.pem'),
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 chars'),
+  JWT_ACCESS_TTL: z.string().min(1).default('15m'),
+  REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
+  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
+  EMAIL_FROM: z.string().min(1, 'EMAIL_FROM is required'),
+  COOKIE_DOMAIN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -38,6 +45,17 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     db: { url: e.DATABASE_URL },
     redis: { url: e.REDIS_URL },
     ssl: { keyPath: e.SSL_KEY_PATH, certPath: e.SSL_CERT_PATH },
+    auth: {
+      jwtAccessSecret: e.JWT_ACCESS_SECRET,
+      jwtAccessTtl: e.JWT_ACCESS_TTL,
+      refreshTtlDays: e.REFRESH_TTL_DAYS,
+      bcryptCost: e.BCRYPT_COST,
+    },
+    email: {
+      resendApiKey: e.RESEND_API_KEY,
+      from: e.EMAIL_FROM,
+    },
+    cookieDomain: e.COOKIE_DOMAIN,
   };
 }
 

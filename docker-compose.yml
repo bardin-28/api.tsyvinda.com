@@ -55,6 +55,13 @@ services:
       - REDIS_URL=redis://redis:6379
       - VIRTUAL_HOST=${BACKEND_HOST}
       - VIRTUAL_PORT=3000
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_ACCESS_TTL=${JWT_ACCESS_TTL:-15m}
+      - REFRESH_TTL_DAYS=${REFRESH_TTL_DAYS:-30}
+      - BCRYPT_COST=${BCRYPT_COST:-12}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
     volumes:
       - ./src:/app/src
     networks:

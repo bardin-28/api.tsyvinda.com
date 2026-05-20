@@ -13,6 +13,13 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [{ url: serverUrl }],
     components: {
+      securitySchemes: {
+        cookieAuth: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'access',
+        },
+      },
       schemas: {
         Error: {
           type: 'object',
@@ -28,6 +35,26 @@ const options: swaggerJsdoc.Options = {
                 requestId: { type: 'string', nullable: true },
               },
             },
+          },
+        },
+        User: {
+          type: 'object',
+          required: ['id', 'firstName', 'lastName', 'email', 'emailVerified', 'createdAt'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            firstName: { type: 'string' },
+            lastName: { type: 'string' },
+            email: { type: 'string', format: 'email' },
+            profileImageUrl: { type: 'string', nullable: true },
+            emailVerified: { type: 'boolean' },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        AuthLoginResponse: {
+          type: 'object',
+          required: ['user'],
+          properties: {
+            user: { $ref: '#/components/schemas/User' },
           },
         },
       },

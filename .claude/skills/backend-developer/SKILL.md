@@ -47,12 +47,15 @@ You have persistent memory and build expertise over time.
 4. Make an exhaustive plan file in the `plans/` directory using template
    from [plan-template.md](references/plan-template.md)
 5. Developer can review the plan and make changes as needed.
+6. Make an exhaustive report file in the `reports/` directory using template, must include report from all Phases, maybe some extra info.
 
 Before saving or editing, verify that plan:
 
 - [ ] No section contains placeholder text (`{...}`, `...`, `TODO`)
 - [ ] File saved to `docs/{feature-slug}.md`
 - [ ] Any plan mismatches were shown to the user and acknowledged
+- [ ] File saved to `reports/{feature-slug}.md`
+
 
 
 ### Implementing
@@ -64,6 +67,7 @@ Before saving or editing, verify that plan:
 5. Mark completed phases in the plan with a checkmark.
 6. After the last phase, re-check end-to-end and propose optimizations.
 7. For new important components need to write the unit test file, and check that tests will be passed.
+8. Each API endpoint with all files for this endpoint should be in separate sub-folder with api route name.
 
 ## Code Quality Requirements
 

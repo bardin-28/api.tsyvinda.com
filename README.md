@@ -18,6 +18,7 @@ Stack: Express 4, TypeORM, Postgres 18.4, Redis 8, Swagger UI, Helmet, rate-limi
 - [Database access](#database-access)
 - [Backups](#backups)
 - [Environment variables](#environment-variables)
+- [Auth](#auth)
 - [Project structure](#project-structure)
 - [Troubleshooting](#troubleshooting)
 
@@ -452,8 +453,80 @@ Nightly dump to `~/backups`, gzip, 14-day retention. Push to S3/Backblaze separa
 | `BASIC_AUTH`           | `false`                | optional                              |
 | `BASIC_AUTH_USERNAME`  | `admin`                | only if `BASIC_AUTH=true`             |
 | `BASIC_AUTH_PASSWORD`  | `password`             | only if `BASIC_AUTH=true`             |
+| `JWT_ACCESS_SECRET`    | —                      | yes (≥32 random chars)                |
+| `JWT_ACCESS_TTL`       | `15m`                  | optional (e.g. `15m`, `1h`)           |
+| `REFRESH_TTL_DAYS`     | `30`                   | optional                              |
+| `BCRYPT_COST`          | `12`                   | optional (4 in tests for speed)       |
+| `RESEND_API_KEY`       | `test`                 | yes (`test` bypasses send)            |
+| `EMAIL_FROM`           | —                      | yes (e.g. `Blog <noreply@x.com>`)     |
+| `COOKIE_DOMAIN`        | —                      | optional (`.tsyvinda.com` for shared) |
 
-`FRONTEND_HOST` and `DATABASE_URL` are validated at boot — app refuses to start without them.
+`FRONTEND_HOST`, `DATABASE_URL`, `JWT_ACCESS_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` are validated at boot — app refuses to start without them.
+
+Generate a `JWT_ACCESS_SECRET`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+---
+
+## Auth
+
+Email + password authentication with email confirmation via Resend. Both access and refresh tokens live in httpOnly cookies named `access` and `refresh`. Schema accommodates Google OAuth later via a separate `user_identities` table.
+
+### Endpoints
+
+| Method | Path                  | Auth         | Purpose                                                          |
+| ------ | --------------------- | ------------ | ---------------------------------------------------------------- |
+| POST   | `/auth/register`      | —            | Create account; sends Resend verification email                  |
+| POST   | `/auth/confirm-email` | —            | Confirm email using the token from the email link                |
+| POST   | `/auth/login`         | —            | Sets `access` + `refresh` cookies; body returns `{ user }`       |
+| POST   | `/auth/refresh`       | refresh cookie | Rotates both cookies; body returns `{ user }`                  |
+| POST   | `/auth/logout`        | refresh cookie | Revokes refresh, clears both cookies                           |
+| GET    | `/auth/me`            | access cookie | Returns the authenticated user's profile                        |
+
+### Token model
+
+- **Access JWT** — HS256, 15-min TTL, signed with `JWT_ACCESS_SECRET`. Lives in the `access` httpOnly cookie at path `/`. Browser sends it automatically on every request.
+- **Refresh token** — opaque 32-byte random value (base64url). Persisted hashed (SHA-256) in the `refresh_tokens` table. Lives in the `refresh` httpOnly cookie scoped to `/auth` so it is only attached to refresh/logout requests. Rotated on every `/auth/refresh`; reuse of a revoked token revokes the entire user chain (theft detection).
+- **Cookie attributes** — both cookies: `HttpOnly; Secure; SameSite=Lax; Domain=${COOKIE_DOMAIN}`. `access` path `/`, `refresh` path `/auth`. Max-Age aligned with `REFRESH_TTL_DAYS`; server enforces the 15-min JWT exp inside the access cookie and FE silently refreshes on 401.
+
+### Verification email
+
+The link in the email points to `${FRONTEND_HOST}/registration?token=${rawToken}`. The frontend should read `token` from the URL and POST it to `/auth/confirm-email`. Tokens expire after 24 hours and are single-use.
+
+### Sample curl
+
+```bash
+# Register
+curl -X POST https://api.tsyvinda.com/auth/register \
+  -H 'content-type: application/json' \
+  -d '{"firstName":"Vlad","lastName":"T","email":"vlad@example.com","password":"Secret123","confirmPassword":"Secret123"}'
+
+# Confirm email (token from the email)
+curl -X POST https://api.tsyvinda.com/auth/confirm-email \
+  -H 'content-type: application/json' \
+  -d '{"token":"<token-from-email>"}'
+
+# Login (capture both cookies)
+curl -i -c cookies.txt -X POST https://api.tsyvinda.com/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"vlad@example.com","password":"Secret123"}'
+
+# Profile (sends access cookie automatically)
+curl -b cookies.txt https://api.tsyvinda.com/auth/me
+
+# Refresh (rotates both cookies)
+curl -b cookies.txt -c cookies.txt -X POST https://api.tsyvinda.com/auth/refresh
+
+# Logout (clears both cookies)
+curl -b cookies.txt -c cookies.txt -X POST https://api.tsyvinda.com/auth/logout
+```
+
+### Cross-origin notes
+
+When the FE (`tsyvinda.com`) and BE (`api.tsyvinda.com`) share a registrable domain, set `COOKIE_DOMAIN=.tsyvinda.com` and `SameSite=Lax` works for both cookies. Frontend `fetch` must use `credentials: 'include'` on every call so the access cookie is attached. If FE/BE ever move to fully cross-site origins, switch `sameSite` to `'none'` in `src/modules/auth/cookies.ts` and ensure CORS sends `Access-Control-Allow-Credentials: true` (already enabled in `src/app.ts`).
 
 ---
 
@@ -462,8 +535,12 @@ Nightly dump to `~/backups`, gzip, 14-day retention. Push to S3/Backblaze separa
 ```
 src/
   config/       # app, db, redis, swagger config
-  modules/      # feature modules (health, ...)
-  app.ts        # express setup (helmet, cors, rate-limit, swagger, routes)
+  modules/
+    auth/       # register/confirm-email/login/refresh/logout/me + entities
+    health/     # health check
+    users/      # User entity
+  shared/       # validate, asyncHandler, http-error, error-handler, rate-limit
+  app.ts        # express setup (helmet, cors, rate-limit, cookie-parser, swagger, routes)
   index.ts      # entrypoint (boot, graceful shutdown)
 docker/
   nginx-proxy/  # custom nginx-proxy image (basic auth, custom.conf)

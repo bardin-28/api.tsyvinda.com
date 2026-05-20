@@ -19,3 +19,4 @@ certs/
 nginx-certs/
 coverage
 dist
+.DS_Store

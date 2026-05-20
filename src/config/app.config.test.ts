@@ -3,6 +3,9 @@ import { loadConfig } from './app.config';
 
 const baseEnv = {
   DATABASE_URL: 'postgres://u:p@localhost:5432/db',
+  JWT_ACCESS_SECRET: 'x'.repeat(32),
+  RESEND_API_KEY: 'test',
+  EMAIL_FROM: 'Blog <noreply@example.com>',
 } as NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {
@@ -13,6 +16,9 @@ describe('loadConfig', () => {
     expect(cfg.isDev).toBe(true);
     expect(cfg.isProd).toBe(false);
     expect(cfg.redis.url).toBe('redis://localhost:6379');
+    expect(cfg.auth.jwtAccessTtl).toBe('15m');
+    expect(cfg.auth.refreshTtlDays).toBe(30);
+    expect(cfg.auth.bcryptCost).toBe(12);
   });
 
   it('coerces PORT from string', () => {
@@ -26,6 +32,17 @@ describe('loadConfig', () => {
 
   it('throws when DATABASE_URL missing', () => {
     expect(() => loadConfig({} as NodeJS.ProcessEnv)).toThrow(/DATABASE_URL/);
+  });
+
+  it('throws when JWT_ACCESS_SECRET missing', () => {
+    const { JWT_ACCESS_SECRET: _omit, ...rest } = baseEnv;
+    expect(() => loadConfig(rest as NodeJS.ProcessEnv)).toThrow(/JWT_ACCESS_SECRET/);
+  });
+
+  it('throws when JWT_ACCESS_SECRET too short', () => {
+    expect(() => loadConfig({ ...baseEnv, JWT_ACCESS_SECRET: 'short' })).toThrow(
+      /Invalid environment/,
+    );
   });
 
   it('flags isProd when NODE_ENV=production', () => {

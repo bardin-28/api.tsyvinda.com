@@ -9,6 +9,10 @@ export default defineConfig({
       NODE_ENV: 'test',
       DATABASE_URL: 'postgres://test:test@localhost:5432/test',
       REDIS_URL: 'redis://localhost:6379',
+      JWT_ACCESS_SECRET: 'test-secret-test-secret-test-secret-32',
+      RESEND_API_KEY: 'test',
+      EMAIL_FROM: 'Blog <noreply@example.com>',
+      BCRYPT_COST: '4',
     },
     coverage: {
       provider: 'v8',

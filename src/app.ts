@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { randomUUID } from 'crypto';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
@@ -8,10 +9,17 @@ import swaggerUi from 'swagger-ui-express';
 import { config } from './config/app.config';
 import { logger } from './config/logger';
 import { swaggerSpec } from './config/swagger';
+import authRouter from './modules/auth/auth.routes';
 import healthRouter from './modules/health/health.routes';
+import { HttpError } from './shared/http-error';
 import { notFound } from './shared/not-found';
 import { errorHandler } from './shared/error-handler';
 import { buildRateLimiter } from './shared/rate-limit';
+
+const allowedOrigins = new Set<string>([
+  ...config.frontendHost,
+  `https://${config.backendHost}`,
+]);
 
 const app = express();
 
@@ -38,20 +46,19 @@ app.use(
 app.use(helmet());
 app.use(
   cors({
-    origin:
-      config.frontendHost.length > 0
-        ? (origin, cb) => {
-            if (!origin || config.frontendHost.includes(origin)) {
-              cb(null, true);
-              return;
-            }
-            cb(new Error('Not allowed by CORS'));
-          }
-        : false,
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.has(origin)) {
+        cb(null, true);
+        return;
+      }
+      cb(new HttpError(403, 'CORS_DENIED', `Origin ${origin} is not allowed`));
+    },
+    credentials: true,
   }),
 );
 app.use(buildRateLimiter());
 app.use(express.json({ limit: '1mb' }));
+app.use(cookieParser());
 
 app.use(
   '/docs',
@@ -60,6 +67,7 @@ app.use(
   swaggerUi.setup(swaggerSpec),
 );
 app.use('/health', healthRouter);
+app.use('/auth', authRouter);
 
 app.use(notFound);
 app.use(errorHandler);

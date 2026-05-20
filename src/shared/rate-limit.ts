@@ -5,7 +5,7 @@ import { redis } from '../config/redis';
 const DEFAULT_WINDOW_MS = 60 * 1000;
 const DEFAULT_LIMIT = 100;
 
-export function buildRateLimiter(overrides: Partial<Options> = {}) {
+export function buildRateLimiter(overrides: Partial<Options> = {}, prefix: string = 'rl:') {
   return rateLimit({
     windowMs: DEFAULT_WINDOW_MS,
     limit: DEFAULT_LIMIT,
@@ -17,7 +17,7 @@ export function buildRateLimiter(overrides: Partial<Options> = {}) {
         if (!cmd) return Promise.resolve(null) as unknown as Promise<RedisReply>;
         return redis.call(cmd, ...rest) as Promise<RedisReply>;
       },
-      prefix: 'rl:',
+      prefix,
     }),
     ...overrides,
   });
