@@ -4,6 +4,7 @@ import type { AuthSessionResult } from './auth.service';
 
 export const ACCESS_COOKIE_NAME = 'access';
 export const REFRESH_COOKIE_NAME = 'refresh';
+export const HAS_SESSION_COOKIE_NAME = 'has_session';
 
 function baseCookieOpts(): CookieOptions {
   return {
@@ -20,12 +21,17 @@ function accessCookieOpts(): CookieOptions {
 }
 
 function refreshCookieOpts(): CookieOptions {
-  return { ...baseCookieOpts(), path: '/auth' };
+  return { ...baseCookieOpts(), path: '/' };
+}
+
+function hasSessionCookieOpts(): CookieOptions {
+  return { ...baseCookieOpts(), path: '/', httpOnly: false };
 }
 
 export function setSessionCookies(res: Response, session: AuthSessionResult): void {
   res.cookie(ACCESS_COOKIE_NAME, session.accessToken, accessCookieOpts());
   res.cookie(REFRESH_COOKIE_NAME, session.refreshToken, refreshCookieOpts());
+  res.cookie(HAS_SESSION_COOKIE_NAME, '1', hasSessionCookieOpts());
 }
 
 export function clearSessionCookies(res: Response): void {
@@ -33,8 +39,11 @@ export function clearSessionCookies(res: Response): void {
   delete accessClear.maxAge;
   const refreshClear = refreshCookieOpts();
   delete refreshClear.maxAge;
+  const hasSessionClear = hasSessionCookieOpts();
+  delete hasSessionClear.maxAge;
   res.clearCookie(ACCESS_COOKIE_NAME, accessClear);
   res.clearCookie(REFRESH_COOKIE_NAME, refreshClear);
+  res.clearCookie(HAS_SESSION_COOKIE_NAME, hasSessionClear);
 }
 
 export function readAccessCookie(req: Request): string | undefined {
