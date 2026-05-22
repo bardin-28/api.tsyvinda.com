@@ -5,8 +5,8 @@ import type { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { HttpError } from '../../../shared/http-error';
 
-export const UPLOAD_DIR = path.resolve('uploads/p');
-export const PROFILE_IMAGE_URL_PREFIX = '/uploads/p';
+export const UPLOAD_DIR = path.resolve('uploads/profile');
+export const PROFILE_IMAGE_URL_PREFIX = '/uploads/profile';
 const MAX_SIZE = 5 * 1024 * 1024;
 
 const EXT_BY_MIME: Record<string, string> = {
