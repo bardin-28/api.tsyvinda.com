@@ -31,9 +31,13 @@ Single test: `npx vitest run path/to/file.test.ts` or `-t "<name>"`.
 src/
   app.ts            Express setup (helmet, cors, rate-limit, swagger mount)
   index.ts          Boot: assertConfig → DataSource.initialize → redis.connect → listen + SIGTERM/SIGINT shutdown
-  config/           app.config (env), database (TypeORM DataSource), redis, swagger
+  db/
+    database.ts     TypeORM DataSource
+    migrations/     TypeORM migrations (glob: src/db/migrations/**/*.{ts,js})
+  redis/
+    redis.ts        ioredis client + error logger
+  shared/           app.config (env), logger, swagger, http-error, async-handler, validate, rate-limit, error-handler, not-found
   modules/<name>/   Feature module — see pattern below
-  migrations/       TypeORM migrations (glob: src/migrations/**/*.{ts,js})
 ```
 
 ## Module pattern
@@ -51,7 +55,7 @@ Mount in `src/app.ts` with `app.use('/<name>', <name>Router)`. See `src/modules/
 
 All request input (body/query/params) is validated with `zod` via the `validate({ body?, query?, params? })` middleware from `src/shared/validate.ts`. Mount it on the route between the router and the controller; it replaces the raw `req.body`/`req.query`/`req.params` with the parsed (and typed) result. On failure it throws `HttpError(400, 'VALIDATION_FAILED', ..., flatten())` which the global error handler formats. Wrap async controllers with `asyncHandler` from `src/shared/async-handler.ts` so thrown errors reach the handler.
 
-The env config in `src/config/app.config.ts` uses the same `zod` pattern: schema parse at module load, throws on missing/invalid env. No manual `assertConfig` — failing fast on boot is the contract.
+The env config in `src/shared/app.config.ts` uses the same `zod` pattern: schema parse at module load, throws on missing/invalid env. No manual `assertConfig` — failing fast on boot is the contract.
 
 ## Code Style
 

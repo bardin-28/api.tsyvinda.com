@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 
-vi.mock('./config/database', () => ({
+vi.mock('./db/database', () => ({
   AppDataSource: {
     isInitialized: true,
     query: vi.fn().mockResolvedValue([{ '?column?': 1 }]),
   },
 }));
 
-vi.mock('./config/redis', () => ({
+vi.mock('./redis/redis', () => ({
   redis: {
     ping: vi.fn().mockResolvedValue('PONG'),
     call: vi.fn().mockImplementation(async (cmd: string) => {
@@ -20,8 +20,8 @@ vi.mock('./config/redis', () => ({
 }));
 
 import app from './app';
-import { AppDataSource } from './config/database';
-import { redis } from './config/redis';
+import { AppDataSource } from './db/database';
+import { redis } from './redis/redis';
 
 describe('GET /health', () => {
   beforeEach(() => {

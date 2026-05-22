@@ -1,6 +1,6 @@
 import rateLimit, { type Options } from 'express-rate-limit';
 import { RedisStore, type RedisReply } from 'rate-limit-redis';
-import { redis } from '../config/redis';
+import { redis } from '../redis/redis';
 
 const DEFAULT_WINDOW_MS = 60 * 1000;
 const DEFAULT_LIMIT = 100;

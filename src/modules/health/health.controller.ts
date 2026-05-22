@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { AppDataSource } from '../../config/database';
-import { logger } from '../../config/logger';
-import { redis } from '../../config/redis';
+import { AppDataSource } from '../../db/database';
+import { logger } from '../../shared/logger';
+import { redis } from '../../redis/redis';
 
 export async function healthCheck(_req: Request, res: Response): Promise<void> {
   let dbOk = false;

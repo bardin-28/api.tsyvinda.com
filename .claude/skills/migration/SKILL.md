@@ -1,15 +1,15 @@
 ---
 name: migration
-description: Create or run a TypeORM migration the project way. Generates against src/migrations/ using the AppDataSource. Triggers on "/migration", "create a migration", "run migrations", "generate migration <name>".
+description: Create or run a TypeORM migration the project way. Generates against src/db/migrations/ using the AppDataSource. Triggers on "/migration", "create a migration", "run migrations", "generate migration <name>".
 ---
 
 # migration
 
-Manage TypeORM migrations for this project. Migrations live at `src/migrations/`. The `AppDataSource` is exported from `src/config/database.ts`.
+Manage TypeORM migrations for this project. Migrations live at `src/db/migrations/`. The `AppDataSource` is exported from `src/db/database.ts`.
 
 ## Background
 
-- In **dev**, `synchronize: true` is on (see `src/config/database.ts`) — TypeORM auto-applies entity changes at boot, so most dev work needs no migration.
+- In **dev**, `synchronize: true` is on (see `src/db/database.ts`) — TypeORM auto-applies entity changes at boot, so most dev work needs no migration.
 - Migrations matter for **prod**: `synchronize` is off there. Any entity change destined for `.env.production` needs a migration.
 - TypeORM CLI is not listed in `package.json` scripts. Run via `tsx` (a devDep already present).
 
@@ -17,8 +17,8 @@ Manage TypeORM migrations for this project. Migrations live at `src/migrations/`
 
 ```bash
 npx tsx ./node_modules/typeorm/cli.js migration:generate \
-  src/migrations/<Name> \
-  -d src/config/database.ts
+  src/db/migrations/<Name> \
+  -d src/db/database.ts
 ```
 
 - `<Name>` is PascalCase, descriptive (`AddUserEmailIndex`, not `Migration1`). TypeORM appends a timestamp.
@@ -27,7 +27,7 @@ npx tsx ./node_modules/typeorm/cli.js migration:generate \
 ## Write a migration by hand
 
 ```bash
-npx tsx ./node_modules/typeorm/cli.js migration:create src/migrations/<Name>
+npx tsx ./node_modules/typeorm/cli.js migration:create src/db/migrations/<Name>
 ```
 
 Edit the generated file's `up` / `down` to use `queryRunner.query(...)` or the TypeORM schema builder.
@@ -35,20 +35,20 @@ Edit the generated file's `up` / `down` to use `queryRunner.query(...)` or the T
 ## Run pending migrations
 
 ```bash
-npx tsx ./node_modules/typeorm/cli.js migration:run -d src/config/database.ts
+npx tsx ./node_modules/typeorm/cli.js migration:run -d src/db/database.ts
 ```
 
 ## Revert the last migration
 
 ```bash
-npx tsx ./node_modules/typeorm/cli.js migration:revert -d src/config/database.ts
+npx tsx ./node_modules/typeorm/cli.js migration:revert -d src/db/database.ts
 ```
 
 ## Rules
 
 - Don't commit a migration without running it locally and confirming `up` + `down` both succeed.
 - Don't modify a migration that's already been merged to `main` — write a new one to fix it.
-- The migrations glob in `database.ts` is `src/migrations/**/*.{ts,js}` — keep new files in that path.
+- The migrations glob in `database.ts` is `src/db/migrations/**/*.{ts,js}` — keep new files in that path.
 - Be careful with `synchronize: true` in dev — it can mask the need for a real migration. When in doubt, test the migration against a fresh database.
 
 ## When the user asks for "/migration <name>"

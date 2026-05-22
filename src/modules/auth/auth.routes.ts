@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import confirmEmailRouter from './confirm-email/confirm-email.routes';
-import loginRouter from './login/login.routes';
-import logoutRouter from './logout/logout.routes';
-import meRouter from './me/me.routes';
-import refreshRouter from './refresh/refresh.routes';
-import registerRouter from './register/register.routes';
+import confirmEmailRouter from './routes/confirm-email';
+import loginRouter from './routes/login';
+import logoutRouter from './routes/logout';
+import meRouter from './routes/me';
+import refreshRouter from './routes/refresh';
+import registerRouter from './routes/register';
 
 const router = Router();
 

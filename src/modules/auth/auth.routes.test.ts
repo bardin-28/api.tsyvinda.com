@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../config/database', () => ({
+vi.mock('../../db/database', () => ({
   AppDataSource: {
     isInitialized: true,
     getRepository: vi.fn(),
@@ -9,7 +9,7 @@ vi.mock('../../config/database', () => ({
   },
 }));
 
-vi.mock('../../config/redis', () => ({
+vi.mock('../../redis/redis', () => ({
   redis: {
     ping: vi.fn().mockResolvedValue('PONG'),
     call: vi.fn().mockImplementation(async (cmd: string) => {
@@ -31,14 +31,14 @@ const { authServiceMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('./auth.service', () => ({
+vi.mock('./services/auth.service', () => ({
   AuthService: vi.fn(),
   authService: authServiceMock,
   toPublicUser: (u: unknown) => u,
 }));
 
 import app from '../../app';
-import { signAccessToken } from './tokens.service';
+import { signAccessToken } from './services/token.service';
 
 const samplePublicUser = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -146,12 +146,16 @@ describe('POST /auth/login', () => {
     const cookies = setCookieList(res.headers);
     const accessCookie = cookies.find((c) => c.startsWith('access='));
     const refreshCookie = cookies.find((c) => c.startsWith('refresh='));
+    const hasSessionCookie = cookies.find((c) => c.startsWith('has_session='));
     expect(accessCookie).toBeDefined();
     expect(accessCookie).toMatch(/HttpOnly/i);
     expect(accessCookie).toMatch(/Path=\//);
     expect(refreshCookie).toBeDefined();
     expect(refreshCookie).toMatch(/HttpOnly/i);
-    expect(refreshCookie).toMatch(/Path=\/auth/);
+    expect(refreshCookie).toMatch(/Path=\/(?!auth)/);
+    expect(hasSessionCookie).toBeDefined();
+    expect(hasSessionCookie).not.toMatch(/HttpOnly/i);
+    expect(hasSessionCookie).toMatch(/Path=\//);
   });
 });
 

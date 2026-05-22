@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import type { Server } from 'http';
 import app from './app';
-import { config } from './config/app.config';
-import { AppDataSource } from './config/database';
-import { logger } from './config/logger';
-import { redis } from './config/redis';
+import { config } from './shared/app.config';
+import { AppDataSource } from './db/database';
+import { logger } from './shared/logger';
+import { redis } from './redis/redis';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
