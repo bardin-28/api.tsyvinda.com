@@ -44,7 +44,7 @@ src/
 
 Each feature is `src/modules/<name>/` with files named `<name>.<role>.ts`:
 
-- `<name>.routes.ts` — Express `Router`, exports `default router`; swagger JSDoc comments live here (the swagger glob is `modules/**/*.routes.{ts,js}`)
+- `<name>.routes.ts` — module root router; swagger JSDoc comments live in `<name>.routes.ts` OR `routes/<endpoint>.{ts,js}` (swagger globs: `modules/**/*.routes.{ts,js}` + `modules/**/routes/*.{ts,js}`)
 - `<name>.controller.ts` — request handlers, `async (req, res): Promise<void>`
 - `<name>.entity.ts` — TypeORM entity (glob: `modules/**/*.entity.{ts,js}`)
 - `<name>.service.ts` — business logic (add when controller grows beyond trivial)

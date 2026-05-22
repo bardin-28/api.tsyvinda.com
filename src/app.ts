@@ -11,6 +11,8 @@ import { logger } from './shared/logger';
 import { swaggerSpec } from './shared/swagger';
 import authRouter from './modules/auth/auth.routes';
 import healthRouter from './modules/health/health.routes';
+import usersRouter from './modules/users/users.routes';
+import { UPLOAD_DIR } from './modules/users/shared/upload';
 import { HttpError } from './shared/http-error';
 import { notFound } from './shared/not-found';
 import { errorHandler } from './shared/error-handler';
@@ -66,8 +68,19 @@ app.use(
   swaggerUi.serve,
   swaggerUi.setup(swaggerSpec),
 );
+app.use(
+  '/uploads/profile',
+  express.static(UPLOAD_DIR, {
+    fallthrough: false,
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    },
+  }),
+);
 app.use('/health', healthRouter);
 app.use('/auth', authRouter);
+app.use('/', usersRouter);
 
 app.use(notFound);
 app.use(errorHandler);

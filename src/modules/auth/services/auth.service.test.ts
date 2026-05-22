@@ -3,7 +3,7 @@ import type { DataSource, EntityManager, EntityTarget } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../../../shared/app.config';
 import { HttpError } from '../../../shared/http-error';
-import { User } from '../../users/user.entity';
+import { User } from '../../users/entities/user.entity';
 import { AuthService } from './auth.service';
 import { EmailService } from './email.service';
 import { EmailVerification } from '../entities/email-verification.entity';

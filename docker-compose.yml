@@ -7,6 +7,7 @@ volumes:
   nginx-vhost:
   postgres-data:
   redis-data:
+  profile-uploads:
 
 x-logging: &default-logging
   driver: json-file
@@ -64,6 +65,7 @@ services:
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
     volumes:
       - ./src:/app/src
+      - profile-uploads:/app/uploads/profile
     networks:
       - app-backend
     healthcheck:

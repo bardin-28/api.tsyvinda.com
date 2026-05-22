@@ -19,4 +19,5 @@ certs/
 nginx-certs/
 coverage
 dist
+uploads
 .DS_Store

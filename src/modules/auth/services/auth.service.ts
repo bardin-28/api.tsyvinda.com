@@ -2,7 +2,7 @@ import type { DataSource, Repository } from 'typeorm';
 import { config } from '../../../shared/app.config';
 import { AppDataSource } from '../../../db/database';
 import { HttpError } from '../../../shared/http-error';
-import { User } from '../../users/user.entity';
+import { User } from '../../users/entities/user.entity';
 import { EmailService, emailService } from './email.service';
 import { EmailVerification } from '../entities/email-verification.entity';
 import { hashPassword, verifyPassword } from './crypto.service';
