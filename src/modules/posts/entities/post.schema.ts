@@ -13,7 +13,6 @@ export const updatePostSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(500).optional(),
   htmlContent: z.string().min(1).max(MAX_HTML).optional(),
-  removeImage: z.literal('true').optional(),
 });
 export type UpdatePostBody = z.infer<typeof updatePostSchema>;
 

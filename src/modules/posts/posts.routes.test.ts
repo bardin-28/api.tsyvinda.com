@@ -211,35 +211,6 @@ describe('PATCH /posts/:id', () => {
     expect(res.body.error.code).toBe('FORBIDDEN');
   });
 
-  it('forwards removeImage=true as imageUrl null to the service', async () => {
-    postServiceMock.update.mockResolvedValue({ ...samplePost, imageUrl: null });
-    const token = signAccessToken(AUTHOR_ID);
-    const res = await request(app)
-      .patch(`/posts/${POST_ID}`)
-      .set('Cookie', [`access=${token}`])
-      .field('removeImage', 'true');
-    expect(res.status).toBe(200);
-    expect(postServiceMock.update).toHaveBeenCalledWith(POST_ID, AUTHOR_ID, {
-      title: undefined,
-      description: undefined,
-      htmlContent: undefined,
-      imageUrl: null,
-    });
-  });
-
-  it('rejects upload + removeImage together with 400', async () => {
-    const token = signAccessToken(AUTHOR_ID);
-    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    const res = await request(app)
-      .patch(`/posts/${POST_ID}`)
-      .set('Cookie', [`access=${token}`])
-      .field('removeImage', 'true')
-      .attach('image', pngHeader, { filename: 'a.png', contentType: 'image/png' });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_FAILED');
-    expect(postServiceMock.update).not.toHaveBeenCalled();
-  });
-
   it('cleans up uploaded file when validation rejects the body', async () => {
     const token = signAccessToken(AUTHOR_ID);
     const oversized = 'a'.repeat(201);

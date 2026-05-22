@@ -19,28 +19,19 @@ async function updatePostController(req: Request, res: Response): Promise<void> 
   const id = req.params.id as string;
   const body = req.body as UpdatePostBody;
   const file = req.file;
-  const wantsRemove = body.removeImage === 'true';
-
-  if (file && wantsRemove) {
-    throw new HttpError(400, 'VALIDATION_FAILED', 'Cannot upload and remove image at the same time');
-  }
 
   if (
     body.title === undefined &&
     body.description === undefined &&
     body.htmlContent === undefined &&
-    !file &&
-    !wantsRemove
+    !file
   ) {
     throw new HttpError(400, 'VALIDATION_FAILED', 'At least one field is required');
   }
 
-  let imageUrl: string | null | undefined;
-  if (file) {
-    imageUrl = `https://${config.backendHost}${POST_IMAGE_URL_PREFIX}/${file.filename}`;
-  } else if (wantsRemove) {
-    imageUrl = null;
-  }
+  const imageUrl: string | undefined = file
+    ? `https://${config.backendHost}${POST_IMAGE_URL_PREFIX}/${file.filename}`
+    : undefined;
 
   const post = await postService.update(id, req.user.id, {
     title: body.title,
@@ -74,14 +65,10 @@ async function updatePostController(req: Request, res: Response): Promise<void> 
  *               title: { type: string, maxLength: 200 }
  *               description: { type: string, maxLength: 500 }
  *               htmlContent: { type: string, maxLength: 100000 }
- *               removeImage:
- *                 type: string
- *                 enum: [true]
- *                 description: Set to "true" to clear the existing image without uploading a new one.
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Post image (jpeg, png, webp, max 5MB). Mutually exclusive with `removeImage`.
+ *                 description: Post image (jpeg, png, webp, max 5MB). Uploading replaces the previous image, previous file deleted automatically.
  *     responses:
  *       200:
  *         description: Updated post
