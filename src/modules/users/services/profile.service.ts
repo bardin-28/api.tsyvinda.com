@@ -10,7 +10,7 @@ import { UPLOAD_DIR } from '../shared/upload';
 export interface UpdateProfileInput {
   firstName?: string;
   lastName?: string;
-  profileImageUrl?: string;
+  profileImageUrl?: string | null;
 }
 
 export class ProfileService {
@@ -42,7 +42,11 @@ export class ProfileService {
 
     await this.users.save(user);
 
-    if (patch.profileImageUrl && prevImage && prevImage !== patch.profileImageUrl) {
+    if (
+      patch.profileImageUrl !== undefined &&
+      prevImage &&
+      prevImage !== patch.profileImageUrl
+    ) {
       void deletePriorImage(prevImage);
     }
 

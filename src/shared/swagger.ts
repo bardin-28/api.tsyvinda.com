@@ -57,6 +57,38 @@ const options: swaggerJsdoc.Options = {
             user: { $ref: '#/components/schemas/User' },
           },
         },
+        PostAuthor: {
+          type: 'object',
+          required: ['id', 'firstName', 'lastName'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            firstName: { type: 'string' },
+            lastName: { type: 'string' },
+            profileImageUrl: { type: 'string', nullable: true },
+          },
+        },
+        Post: {
+          type: 'object',
+          required: ['id', 'title', 'htmlContent', 'author', 'createdAt', 'updatedAt'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            title: { type: 'string' },
+            description: { type: 'string', nullable: true },
+            htmlContent: { type: 'string' },
+            imageUrl: { type: 'string', nullable: true },
+            author: { $ref: '#/components/schemas/PostAuthor' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        PostList: {
+          type: 'object',
+          required: ['items', 'nextCursor'],
+          properties: {
+            items: { type: 'array', items: { $ref: '#/components/schemas/Post' } },
+            nextCursor: { type: 'string', nullable: true },
+          },
+        },
       },
       responses: {
         BadRequest: {

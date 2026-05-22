@@ -9,6 +9,7 @@ volumes:
   postgres-data:
   redis-data:
   profile-uploads:
+  post-uploads:
 
 x-logging: &default-logging
   driver: json-file
@@ -93,6 +94,7 @@ services:
           memory: 512M
     volumes:
       - profile-uploads:/app/uploads/profile
+      - post-uploads:/app/uploads/posts
     networks:
       - app-backend
     depends_on:

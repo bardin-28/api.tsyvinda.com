@@ -1,14 +1,13 @@
 import { Router, type Request, type Response } from 'express';
-import { unlink } from 'fs/promises';
-import path from 'path';
 import { requireAuth } from '../../auth/middleware/is-authenticated';
 import { asyncHandler } from '../../../shared/async-handler';
+import { cleanupUploadOnError } from '../../../shared/cleanup-upload';
 import { HttpError } from '../../../shared/http-error';
 import { config } from '../../../shared/app.config';
 import { validate } from '../../../shared/validate';
 import { updateProfileSchema, type UpdateProfileBody } from '../entities/profile.schema';
 import { profileService } from '../services/profile.service';
-import { PROFILE_IMAGE_URL_PREFIX, UPLOAD_DIR, profileImageUpload } from '../shared/upload';
+import { PROFILE_IMAGE_URL_PREFIX, profileImageUpload } from '../shared/upload';
 
 const router = Router();
 
@@ -27,35 +26,33 @@ async function patchProfileController(req: Request, res: Response): Promise<void
 
   const body = req.body as UpdateProfileBody;
   const file = req.file;
+  const wantsRemove = body.removeImage === 'true';
 
-  if (body.firstName === undefined && body.lastName === undefined && !file) {
+  if (file && wantsRemove) {
+    throw new HttpError(
+      400,
+      'VALIDATION_FAILED',
+      'Cannot upload and remove image at the same time',
+    );
+  }
+
+  if (body.firstName === undefined && body.lastName === undefined && !file && !wantsRemove) {
     throw new HttpError(400, 'VALIDATION_FAILED', 'At least one field is required');
   }
 
-  let profileImageUrl: string | undefined;
+  let profileImageUrl: string | null | undefined;
   if (file) {
     profileImageUrl = `https://${config.backendHost}${PROFILE_IMAGE_URL_PREFIX}/${file.filename}`;
+  } else if (wantsRemove) {
+    profileImageUrl = null;
   }
 
-  try {
-    const profile = await profileService.update(req.user.id, {
-      firstName: body.firstName,
-      lastName: body.lastName,
-      profileImageUrl,
-    });
-    res.status(200).json(profile);
-  } catch (err) {
-    if (file) await safeUnlink(path.join(UPLOAD_DIR, file.filename));
-    throw err;
-  }
-}
-
-async function safeUnlink(p: string): Promise<void> {
-  try {
-    await unlink(p);
-  } catch {
-    // best-effort
-  }
+  const profile = await profileService.update(req.user.id, {
+    firstName: body.firstName,
+    lastName: body.lastName,
+    profileImageUrl,
+  });
+  res.status(200).json(profile);
 }
 
 /**
@@ -96,10 +93,14 @@ router.get('/', requireAuth, asyncHandler(getProfileController));
  *             properties:
  *               firstName: { type: string, maxLength: 50 }
  *               lastName: { type: string, maxLength: 50 }
+ *               removeImage:
+ *                 type: string
+ *                 enum: [true]
+ *                 description: Set to "true" to clear the existing image without uploading a new one.
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Profile image (jpeg, png, webp, max 5MB)
+ *                 description: Profile image (jpeg, png, webp, max 5MB). Mutually exclusive with `removeImage`.
  *     responses:
  *       200:
  *         description: Updated profile
@@ -120,6 +121,7 @@ router.patch(
   '/',
   requireAuth,
   profileImageUpload,
+  cleanupUploadOnError,
   validate({ body: updateProfileSchema }),
   asyncHandler(patchProfileController),
 );

@@ -20,7 +20,7 @@ RUN apk add --no-cache curl tini
 COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=builder /app/dist ./dist
-RUN mkdir -p /app/uploads/profile && chown -R node:node /app/uploads
+RUN mkdir -p /app/uploads/profile /app/uploads/posts && chown -R node:node /app/uploads
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
