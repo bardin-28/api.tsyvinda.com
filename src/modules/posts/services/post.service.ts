@@ -17,6 +17,7 @@ export interface PublicAuthor {
 export interface PublicPost {
   id: string;
   title: string;
+  slug: string;
   description: string | null;
   htmlContent: string;
   imageUrl: string | null;
@@ -27,6 +28,7 @@ export interface PublicPost {
 
 export interface CreatePostInput {
   title: string;
+  slug: string;
   description?: string;
   htmlContent: string;
   imageUrl?: string | null;
@@ -34,6 +36,7 @@ export interface CreatePostInput {
 
 export interface UpdatePostInput {
   title?: string;
+  slug?: string;
   description?: string;
   htmlContent?: string;
   imageUrl?: string | null;
@@ -95,6 +98,7 @@ export function toPublicPost(post: Post, author: User): PublicPost {
   return {
     id: post.id,
     title: post.title,
+    slug: post.slug,
     description: post.description,
     htmlContent: post.htmlContent,
     imageUrl: post.imageUrl,
@@ -120,8 +124,13 @@ export class PostService {
     if (!author) {
       throw new HttpError(404, 'USER_NOT_FOUND', 'Author not found');
     }
+    const slugTaken = await this.posts.findOne({ where: { slug: input.slug } });
+    if (slugTaken) {
+      throw new HttpError(409, 'SLUG_TAKEN', 'Slug already in use');
+    }
     const post = this.posts.create({
       title: input.title,
+      slug: input.slug,
       description: input.description ?? null,
       htmlContent: input.htmlContent,
       imageUrl: input.imageUrl ?? null,
@@ -158,11 +167,11 @@ export class PostService {
     };
   }
 
-  async getById(id: string): Promise<PublicPost> {
+  async getBySlug(slug: string): Promise<PublicPost> {
     const post = await this.posts
       .createQueryBuilder('post')
       .innerJoinAndMapOne('post.author', User, 'author', 'author.id = post.authorId')
-      .where('post.id = :id', { id })
+      .where('post.slug = :slug', { slug })
       .getOne();
     if (!post) {
       throw new HttpError(404, 'POST_NOT_FOUND', 'Post not found');
@@ -181,6 +190,13 @@ export class PostService {
 
     const prevImage = post.imageUrl;
 
+    if (patch.slug !== undefined && patch.slug !== post.slug) {
+      const slugTaken = await this.posts.findOne({ where: { slug: patch.slug } });
+      if (slugTaken && slugTaken.id !== post.id) {
+        throw new HttpError(409, 'SLUG_TAKEN', 'Slug already in use');
+      }
+      post.slug = patch.slug;
+    }
     if (patch.title !== undefined) post.title = patch.title;
     if (patch.description !== undefined) post.description = patch.description;
     if (patch.htmlContent !== undefined) post.htmlContent = patch.htmlContent;

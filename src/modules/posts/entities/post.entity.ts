@@ -19,6 +19,10 @@ export class Post {
   @Column({ type: 'varchar', length: 200 })
   title: string;
 
+  @Index('posts_slug_uniq', { unique: true })
+  @Column({ type: 'varchar', length: 200 })
+  slug: string;
+
   @Column({ type: 'varchar', length: 500, nullable: true })
   description: string | null;
 

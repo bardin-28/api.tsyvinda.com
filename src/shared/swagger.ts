@@ -69,10 +69,11 @@ const options: swaggerJsdoc.Options = {
         },
         Post: {
           type: 'object',
-          required: ['id', 'title', 'htmlContent', 'author', 'createdAt', 'updatedAt'],
+          required: ['id', 'title', 'slug', 'htmlContent', 'author', 'createdAt', 'updatedAt'],
           properties: {
             id: { type: 'string', format: 'uuid' },
             title: { type: 'string' },
+            slug: { type: 'string' },
             description: { type: 'string', nullable: true },
             htmlContent: { type: 'string' },
             imageUrl: { type: 'string', nullable: true },

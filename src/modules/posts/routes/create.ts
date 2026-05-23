@@ -24,6 +24,7 @@ async function createPostController(req: Request, res: Response): Promise<void> 
 
   const post = await postService.create(req.user.id, {
     title: body.title,
+    slug: body.slug,
     description: body.description,
     htmlContent: body.htmlContent,
     imageUrl,
@@ -45,9 +46,14 @@ async function createPostController(req: Request, res: Response): Promise<void> 
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [title, htmlContent]
+ *             required: [title, slug, htmlContent]
  *             properties:
  *               title: { type: string, maxLength: 200 }
+ *               slug:
+ *                 type: string
+ *                 maxLength: 200
+ *                 pattern: '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
+ *                 description: Unique URL-safe identifier (lowercase, hyphens)
  *               description: { type: string, maxLength: 500 }
  *               htmlContent: { type: string, maxLength: 100000 }
  *               image:
@@ -65,6 +71,9 @@ async function createPostController(req: Request, res: Response): Promise<void> 
  *         $ref: '#/components/responses/BadRequest'
  *       401:
  *         description: Missing or invalid access token
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+ *       409:
+ *         description: Slug already in use
  *         content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
  *       413:
  *         description: Uploaded image exceeds size limit

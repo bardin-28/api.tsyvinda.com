@@ -22,6 +22,7 @@ async function updatePostController(req: Request, res: Response): Promise<void> 
 
   if (
     body.title === undefined &&
+    body.slug === undefined &&
     body.description === undefined &&
     body.htmlContent === undefined &&
     !file
@@ -35,6 +36,7 @@ async function updatePostController(req: Request, res: Response): Promise<void> 
 
   const post = await postService.update(id, req.user.id, {
     title: body.title,
+    slug: body.slug,
     description: body.description,
     htmlContent: body.htmlContent,
     imageUrl,
@@ -63,6 +65,11 @@ async function updatePostController(req: Request, res: Response): Promise<void> 
  *             type: object
  *             properties:
  *               title: { type: string, maxLength: 200 }
+ *               slug:
+ *                 type: string
+ *                 maxLength: 200
+ *                 pattern: '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
+ *                 description: Unique URL-safe identifier (lowercase, hyphens)
  *               description: { type: string, maxLength: 500 }
  *               htmlContent: { type: string, maxLength: 100000 }
  *               image:
@@ -86,6 +93,9 @@ async function updatePostController(req: Request, res: Response): Promise<void> 
  *         content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
  *       404:
  *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         description: Slug already in use
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
  *       413:
  *         description: Uploaded image exceeds size limit
  *         content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

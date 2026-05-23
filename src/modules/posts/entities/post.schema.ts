@@ -2,8 +2,19 @@ import { z } from 'zod';
 
 const MAX_HTML = 100_000;
 
+export const slugSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/,
+    'Slug must be lowercase alphanumeric with hyphens (no leading/trailing hyphen)',
+  );
+
 export const createPostSchema = z.object({
   title: z.string().trim().min(1).max(200),
+  slug: slugSchema,
   description: z.string().trim().max(500).optional(),
   htmlContent: z.string().min(1).max(MAX_HTML),
 });
@@ -11,6 +22,7 @@ export type CreatePostBody = z.infer<typeof createPostSchema>;
 
 export const updatePostSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
+  slug: slugSchema.optional(),
   description: z.string().trim().max(500).optional(),
   htmlContent: z.string().min(1).max(MAX_HTML).optional(),
 });
