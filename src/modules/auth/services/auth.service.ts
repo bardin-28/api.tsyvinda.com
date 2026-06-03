@@ -2,6 +2,7 @@ import type { DataSource, Repository } from 'typeorm';
 import { config } from '../../../shared/app.config';
 import { AppDataSource } from '../../../db/database';
 import { HttpError } from '../../../shared/http-error';
+import { logger } from '../../../shared/logger';
 import { User } from '../../users/entities/user.entity';
 import { EmailService, emailService } from './email.service';
 import { EmailVerification } from '../entities/email-verification.entity';
@@ -145,6 +146,20 @@ export class AuthService {
         .getRepository(User)
         .update({ id: verification.userId }, { emailVerified: true });
     });
+
+    // Welcome email fires once, after the account is verified. Delivery failure
+    // must not fail confirmation (the account is already verified), so log and move on.
+    const verifiedUser = await this.users.findOne({ where: { id: verification.userId } });
+    if (verifiedUser) {
+      try {
+        await this.email.sendWelcomeEmail({
+          to: verifiedUser.email,
+          username: verifiedUser.firstName,
+        });
+      } catch (err) {
+        logger.error({ err, userId: verifiedUser.id }, 'failed to send welcome email');
+      }
+    }
   }
 
   async login(input: LoginInput): Promise<AuthSessionResult> {

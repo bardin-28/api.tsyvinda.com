@@ -1,7 +1,11 @@
+import { createElement } from 'react';
+import { render } from '@react-email/render';
 import { Resend } from 'resend';
 import { config } from '../../../shared/app.config';
 import { logger } from '../../../shared/logger';
 import { HttpError } from '../../../shared/http-error';
+import { WelcomeEmail } from '../../../emails/WelcomeEmail';
+import { ConfirmEmail } from '../../../emails/ConfirmEmail';
 
 interface VerificationEmailInput {
   to: string;
@@ -9,21 +13,9 @@ interface VerificationEmailInput {
   url: string;
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      default:
-        return '&#39;';
-    }
-  });
+interface WelcomeEmailInput {
+  to: string;
+  username: string;
 }
 
 export class EmailService {
@@ -34,18 +26,10 @@ export class EmailService {
   }
 
   async sendVerificationEmail({ to, firstName, url }: VerificationEmailInput): Promise<void> {
-    const safeName = escapeHtml(firstName);
-    const safeUrl = escapeHtml(url);
+    const element = createElement(ConfirmEmail, { firstName, url });
+    const html = await render(element);
+    const text = await render(element, { plainText: true });
     const subject = 'Confirm your email';
-    const html = [
-      `<p>Hi ${safeName},</p>`,
-      `<p>Confirm your email by clicking the link below:</p>`,
-      `<p><a href="${safeUrl}">Confirm email</a></p>`,
-      `<p>If the button does not work, paste this URL into your browser:</p>`,
-      `<p>${safeUrl}</p>`,
-      `<p>This link expires in 24 hours.</p>`,
-    ].join('');
-    const text = `Hi ${firstName},\n\nConfirm your email: ${url}\n\nThis link expires in 24 hours.\n`;
 
     if (!this.client) {
       logger.debug({ to, url }, 'email:verify (mocked)');
@@ -62,6 +46,31 @@ export class EmailService {
 
     if (error) {
       throw new HttpError(502, 'EMAIL_SEND_FAILED', 'Failed to send verification email', error);
+    }
+  }
+
+  async sendWelcomeEmail({ to, username }: WelcomeEmailInput): Promise<void> {
+    const appUrl = config.frontendHost[0];
+    const element = createElement(WelcomeEmail, { username, appUrl });
+    const html = await render(element);
+    const text = await render(element, { plainText: true });
+    const subject = 'Welcome!';
+
+    if (!this.client) {
+      logger.debug({ to }, 'email:welcome (mocked)');
+      return;
+    }
+
+    const { error } = await this.client.emails.send({
+      from: config.email.from,
+      to,
+      subject,
+      html,
+      text,
+    });
+
+    if (error) {
+      throw new HttpError(502, 'EMAIL_SEND_FAILED', 'Failed to send welcome email', error);
     }
   }
 }
