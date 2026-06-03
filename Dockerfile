@@ -1,24 +1,30 @@
+ARG BUILD_JOBS=2
+
 FROM node:22-alpine AS base
 WORKDIR /app
+ARG BUILD_JOBS
+ENV MAKEFLAGS="-j${BUILD_JOBS}" UV_THREADPOOL_SIZE=${BUILD_JOBS} NODE_OPTIONS="--max-old-space-size=4096"
 COPY package*.json ./
 
 FROM base AS development
 ENV NODE_ENV=development
-RUN npm install
+RUN npm install --no-audit --no-fund
 COPY . .
 CMD ["npm", "run", "dev"]
 
 FROM base AS builder
-RUN npm ci --include=dev --ignore-scripts
+RUN npm ci --include=dev --ignore-scripts --no-audit --no-fund
 COPY . .
 RUN npm run build
 
 FROM node:22-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
+ARG BUILD_JOBS
+ENV UV_THREADPOOL_SIZE=${BUILD_JOBS}
 RUN apk add --no-cache curl tini
 COPY package*.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 RUN mkdir -p /app/uploads/profile /app/uploads/posts && chown -R node:node /app/uploads
 USER node
