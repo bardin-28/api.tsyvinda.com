@@ -47,5 +47,8 @@
   },
   "sandbox": {
     "enabled": true
-  }
+  },
+  "additionalDirectories": [
+    "../test-fe"
+  ]
 }
