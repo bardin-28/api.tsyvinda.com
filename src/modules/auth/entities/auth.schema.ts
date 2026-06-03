@@ -38,3 +38,25 @@ export const confirmEmailBodySchema = z.object({
   token: z.string().min(32).max(128),
 });
 export type ConfirmEmailBody = z.infer<typeof confirmEmailBodySchema>;
+
+export const forgotPasswordBodySchema = z.object({
+  email: emailSchema,
+});
+export type ForgotPasswordBody = z.infer<typeof forgotPasswordBodySchema>;
+
+export const resetPasswordBodySchema = z
+  .object({
+    token: z.string().min(32).max(128),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1),
+  })
+  .superRefine((data, ctx) => {
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['confirmPassword'],
+        message: 'passwords do not match',
+      });
+    }
+  });
+export type ResetPasswordBody = z.infer<typeof resetPasswordBodySchema>;

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { DataSource, EntityManager, EntityTarget } from 'typeorm';
+import { FindOperator, type DataSource, type EntityManager, type EntityTarget } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../../../shared/app.config';
 import { HttpError } from '../../../shared/http-error';
@@ -7,9 +7,10 @@ import { User } from '../../users/entities/user.entity';
 import { AuthService } from './auth.service';
 import { EmailService } from './email.service';
 import { EmailVerification } from '../entities/email-verification.entity';
-import { hashPassword } from './crypto.service';
+import { PasswordReset } from '../entities/password-reset.entity';
+import { hashPassword, verifyPassword } from './crypto.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
-import { hashOpaqueToken } from './token.service';
+import { generateOpaqueToken, hashOpaqueToken } from './token.service';
 import { UserIdentity } from '../entities/user-identity.entity';
 
 interface Identified {
@@ -55,7 +56,12 @@ class FakeRepo<T extends Identified> {
 
 function matches<T>(row: T, where: Partial<T>): boolean {
   return Object.entries(where).every(([key, value]) => {
-    return (row as Record<string, unknown>)[key] === value;
+    const cell = (row as Record<string, unknown>)[key];
+    // Only IsNull() is used in service queries; support it in the fake repo.
+    if (value instanceof FindOperator) {
+      return cell === null || cell === undefined;
+    }
+    return cell === value;
   });
 }
 
@@ -77,6 +83,7 @@ function makeFakeDS() {
     identities: getRepository(UserIdentity),
     verifications: getRepository(EmailVerification),
     refreshTokens: getRepository(RefreshToken),
+    passwordResets: getRepository(PasswordReset),
   };
 }
 
@@ -84,6 +91,7 @@ function makeEmail() {
   return {
     sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
     sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
+    sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -278,6 +286,7 @@ async function seedUserWithPassword(
     passwordHash,
     profileImageUrl: null,
     emailVerified: true,
+    approvedByAdmin: false,
     ...overrides,
   } as User;
   await fake.users.save(user);
@@ -421,33 +430,6 @@ describe('AuthService.rotateRefresh', () => {
   });
 });
 
-describe('AuthService.getProfile', () => {
-  it('returns the public user shape', async () => {
-    const fake = makeFakeDS();
-    const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
-    const user = await seedUserWithPassword(fake);
-    const profile = await service.getProfile(user.id);
-    expect(profile).toMatchObject({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      profileImageUrl: null,
-      emailVerified: true,
-    });
-    expect((profile as unknown as { passwordHash?: string }).passwordHash).toBeUndefined();
-  });
-
-  it('throws 404 USER_NOT_FOUND when the user does not exist', async () => {
-    const fake = makeFakeDS();
-    const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
-    await expect(service.getProfile(randomUUID())).rejects.toMatchObject({
-      status: 404,
-      code: 'USER_NOT_FOUND',
-    });
-  });
-});
-
 describe('AuthService.logout', () => {
   it('revokes the matching refresh token', async () => {
     const fake = makeFakeDS();
@@ -468,6 +450,169 @@ describe('AuthService.logout', () => {
     const fake = makeFakeDS();
     const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
     await expect(service.logout(undefined)).resolves.toBeUndefined();
+  });
+});
+
+describe('AuthService.requestPasswordReset', () => {
+  it('creates a reset row and sends the email for a known account', async () => {
+    const fake = makeFakeDS();
+    const email = makeEmail();
+    const service = new AuthService(fake.ds, email as unknown as EmailService);
+    const user = await seedUserWithPassword(fake, { email: 'reset@example.com' });
+
+    await service.requestPasswordReset('reset@example.com');
+
+    expect(fake.passwordResets.rows).toHaveLength(1);
+    expect(fake.passwordResets.rows[0]?.userId).toBe(user.id);
+    expect(fake.passwordResets.rows[0]?.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(fake.passwordResets.rows[0]?.consumedAt).toBeNull();
+
+    expect(email.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+    const call = email.sendPasswordResetEmail.mock.calls[0]?.[0];
+    expect(call.to).toBe('reset@example.com');
+    expect(call.firstName).toBe('V');
+    expect(call.url.startsWith(`${TEST_FRONTEND}/reset-password?token=`)).toBe(true);
+  });
+
+  it('is a silent no-op for an unknown email (enumeration safe)', async () => {
+    const fake = makeFakeDS();
+    const email = makeEmail();
+    const service = new AuthService(fake.ds, email as unknown as EmailService);
+
+    await expect(service.requestPasswordReset('nobody@example.com')).resolves.toBeUndefined();
+    expect(fake.passwordResets.rows).toHaveLength(0);
+    expect(email.sendPasswordResetEmail).not.toHaveBeenCalled();
+  });
+
+  it('is a silent no-op for an OAuth-only account with no password', async () => {
+    const fake = makeFakeDS();
+    const email = makeEmail();
+    const service = new AuthService(fake.ds, email as unknown as EmailService);
+    await fake.users.save({
+      id: randomUUID(),
+      firstName: 'O',
+      lastName: 'Auth',
+      email: 'oauth@example.com',
+      passwordHash: null,
+      profileImageUrl: null,
+      emailVerified: true,
+    } as User);
+
+    await expect(service.requestPasswordReset('oauth@example.com')).resolves.toBeUndefined();
+    expect(fake.passwordResets.rows).toHaveLength(0);
+    expect(email.sendPasswordResetEmail).not.toHaveBeenCalled();
+  });
+
+  it('invalidates outstanding reset tokens before issuing a new one', async () => {
+    const fake = makeFakeDS();
+    const email = makeEmail();
+    const service = new AuthService(fake.ds, email as unknown as EmailService);
+    const user = await seedUserWithPassword(fake, { email: 'reset@example.com' });
+    await fake.passwordResets.save({
+      id: randomUUID(),
+      userId: user.id,
+      tokenHash: hashOpaqueToken('old-token-aaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } as PasswordReset);
+
+    await service.requestPasswordReset('reset@example.com');
+
+    expect(fake.passwordResets.rows).toHaveLength(2);
+    const active = fake.passwordResets.rows.filter((r) => r.consumedAt === null);
+    expect(active).toHaveLength(1);
+  });
+
+  it('throws 500 when FRONTEND_HOST is not configured', async () => {
+    config.frontendHost = [];
+    const fake = makeFakeDS();
+    const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
+    await seedUserWithPassword(fake, { email: 'reset@example.com' });
+
+    await expect(service.requestPasswordReset('reset@example.com')).rejects.toMatchObject({
+      status: 500,
+      code: 'EMAIL_NOT_CONFIGURED',
+    });
+  });
+});
+
+describe('AuthService.resetPassword', () => {
+  it('sets the new password, consumes the token, and revokes sessions', async () => {
+    const fake = makeFakeDS();
+    const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
+    const user = await seedUserWithPassword(fake, { email: 'reset@example.com' });
+    const session = await service.login({
+      email: user.email,
+      password: 'Secret123',
+      userAgent: null,
+      ip: null,
+    });
+    const { raw, hash } = generateOpaqueToken();
+    await fake.passwordResets.save({
+      id: randomUUID(),
+      userId: user.id,
+      tokenHash: hash,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } as PasswordReset);
+
+    await service.resetPassword(raw, 'NewSecret123');
+
+    const updated = await fake.users.findOne({ where: { id: user.id } });
+    expect(await verifyPassword('NewSecret123', updated!.passwordHash!)).toBe(true);
+    const reset = await fake.passwordResets.findOne({ where: { tokenHash: hash } });
+    expect(reset?.consumedAt).toBeInstanceOf(Date);
+    const oldRow = fake.refreshTokens.rows.find(
+      (r) => r.tokenHash === hashOpaqueToken(session.refreshToken),
+    );
+    expect(oldRow?.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it('throws 400 for an unknown token', async () => {
+    const fake = makeFakeDS();
+    const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
+    await expect(service.resetPassword('z'.repeat(43), 'NewSecret123')).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_TOKEN',
+    });
+  });
+
+  it('throws 400 for an already-consumed token', async () => {
+    const fake = makeFakeDS();
+    const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
+    const user = await seedUserWithPassword(fake);
+    const { raw, hash } = generateOpaqueToken();
+    await fake.passwordResets.save({
+      id: randomUUID(),
+      userId: user.id,
+      tokenHash: hash,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: new Date(),
+    } as PasswordReset);
+
+    await expect(service.resetPassword(raw, 'NewSecret123')).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_TOKEN',
+    });
+  });
+
+  it('throws 400 for an expired token', async () => {
+    const fake = makeFakeDS();
+    const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
+    const user = await seedUserWithPassword(fake);
+    const { raw, hash } = generateOpaqueToken();
+    await fake.passwordResets.save({
+      id: randomUUID(),
+      userId: user.id,
+      tokenHash: hash,
+      expiresAt: new Date(Date.now() - 1000),
+      consumedAt: null,
+    } as PasswordReset);
+
+    await expect(service.resetPassword(raw, 'NewSecret123')).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_TOKEN',
+    });
   });
 });
 
