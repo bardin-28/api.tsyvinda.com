@@ -1,4 +1,4 @@
-import type { DataSource, Repository } from 'typeorm';
+import { IsNull, type DataSource, type Repository } from 'typeorm';
 import { config } from '../../../shared/app.config';
 import { AppDataSource } from '../../../db/database';
 import { HttpError } from '../../../shared/http-error';
@@ -6,6 +6,7 @@ import { logger } from '../../../shared/logger';
 import { User } from '../../users/entities/user.entity';
 import { EmailService, emailService } from './email.service';
 import { EmailVerification } from '../entities/email-verification.entity';
+import { PasswordReset } from '../entities/password-reset.entity';
 import { hashPassword, verifyPassword } from './crypto.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { generateOpaqueToken, hashOpaqueToken, signAccessToken } from './token.service';
@@ -13,6 +14,7 @@ import { UserIdentity } from '../entities/user-identity.entity';
 
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const REUSE_IDEMPOTENCY_MS = 60 * 60 * 1000;
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
 
 export interface PublicUser {
   id: string;
@@ -21,6 +23,7 @@ export interface PublicUser {
   email: string;
   profileImageUrl: string | null;
   emailVerified: boolean;
+  approvedByAdmin: boolean;
   createdAt: Date;
 }
 
@@ -66,6 +69,10 @@ export class AuthService {
 
   private get refreshTokens(): Repository<RefreshToken> {
     return this.ds.getRepository(RefreshToken);
+  }
+
+  private get passwordResets(): Repository<PasswordReset> {
+    return this.ds.getRepository(PasswordReset);
   }
 
   async register(input: RegisterInput): Promise<void> {
@@ -162,6 +169,80 @@ export class AuthService {
     }
   }
 
+  // Always resolves without revealing whether the email exists (enumeration safe).
+  // The route returns a generic 200 regardless of outcome.
+  async requestPasswordReset(rawEmail: string): Promise<void> {
+    const email = rawEmail;
+    const user = await this.users.findOne({ where: { email } });
+
+    // No account, or an OAuth-only account with no password to reset: do nothing.
+    if (!user || !user.passwordHash) {
+      return;
+    }
+
+    const frontend = config.frontendHost[0];
+    if (!frontend) {
+      throw new HttpError(500, 'EMAIL_NOT_CONFIGURED', 'FRONTEND_HOST is not configured');
+    }
+
+    const { raw: rawToken, hash: tokenHash } = generateOpaqueToken();
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+    const now = new Date();
+
+    await this.ds.transaction(async (manager) => {
+      const repo = manager.getRepository(PasswordReset);
+      // Invalidate any outstanding reset tokens so only the newest link is valid.
+      const outstanding = await repo.find({ where: { userId: user.id, consumedAt: IsNull() } });
+      for (const row of outstanding) row.consumedAt = now;
+      if (outstanding.length > 0) await repo.save(outstanding);
+
+      const reset = repo.create({
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+        consumedAt: null,
+      });
+      await repo.save(reset);
+    });
+
+    await this.email.sendPasswordResetEmail({
+      to: user.email,
+      firstName: user.firstName,
+      url: `${frontend}/reset-password?token=${rawToken}`,
+    });
+  }
+
+  async resetPassword(rawToken: string, newPassword: string): Promise<void> {
+    const tokenHash = hashOpaqueToken(rawToken);
+    const reset = await this.passwordResets.findOne({ where: { tokenHash } });
+    if (!reset) {
+      throw new HttpError(400, 'INVALID_TOKEN', 'Invalid password reset token');
+    }
+    if (reset.consumedAt) {
+      throw new HttpError(400, 'INVALID_TOKEN', 'Password reset token already used');
+    }
+    if (reset.expiresAt.getTime() < Date.now()) {
+      throw new HttpError(400, 'INVALID_TOKEN', 'Password reset token expired');
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+
+    await this.ds.transaction(async (manager) => {
+      reset.consumedAt = new Date();
+      await manager.getRepository(PasswordReset).save(reset);
+      await manager.getRepository(User).update({ id: reset.userId }, { passwordHash });
+
+      // Changing the password invalidates every existing session.
+      const tokens = await manager
+        .getRepository(RefreshToken)
+        .find({ where: { userId: reset.userId } });
+      const now = new Date();
+      const active = tokens.filter((token) => !token.revokedAt);
+      for (const token of active) token.revokedAt = now;
+      if (active.length > 0) await manager.getRepository(RefreshToken).save(active);
+    });
+  }
+
   async login(input: LoginInput): Promise<AuthSessionResult> {
     const user = await this.users.findOne({ where: { email: input.email } });
     if (!user || !user.passwordHash) {
@@ -223,14 +304,6 @@ export class AuthService {
     await this.refreshTokens.save(existing);
   }
 
-  async getProfile(userId: string): Promise<PublicUser> {
-    const user = await this.users.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new HttpError(404, 'USER_NOT_FOUND', 'User not found');
-    }
-    return toPublicUser(user);
-  }
-
   private async issueSession(
     user: User,
     userAgent: string | null,
@@ -261,6 +334,7 @@ export function toPublicUser(user: User): PublicUser {
     email: user.email,
     profileImageUrl: user.profileImageUrl,
     emailVerified: user.emailVerified,
+    approvedByAdmin: user.approvedByAdmin,
     createdAt: user.createdAt,
   };
 }

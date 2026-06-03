@@ -90,3 +90,54 @@ describe('EmailService.sendVerificationEmail', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 });
+
+describe('EmailService.sendPasswordResetEmail', () => {
+  beforeEach(() => {
+    sendMock.mockReset();
+  });
+
+  it('renders the name and reset URL and sends it via Resend', async () => {
+    sendMock.mockResolvedValue({ data: { id: 'email-id' }, error: null });
+    const service = new EmailService('real-api-key');
+    const url = 'https://tsyvinda.com/reset-password?token=abc';
+
+    await service.sendPasswordResetEmail({ to: 'jane@example.com', firstName: 'Jane', url });
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Blog <noreply@example.com>',
+        to: 'jane@example.com',
+        subject: 'Reset your password',
+        html: expect.stringContaining(url),
+        text: expect.stringContaining('Jane'),
+      }),
+    );
+  });
+
+  it('throws a 502 EMAIL_SEND_FAILED when Resend returns an error', async () => {
+    sendMock.mockResolvedValue({ data: null, error: { message: 'boom' } });
+    const service = new EmailService('real-api-key');
+
+    await expect(
+      service.sendPasswordResetEmail({
+        to: 'jane@example.com',
+        firstName: 'Jane',
+        url: 'https://tsyvinda.com/reset-password?token=abc',
+      }),
+    ).rejects.toMatchObject({ status: 502, code: 'EMAIL_SEND_FAILED' });
+  });
+
+  it('skips sending in the mocked client path (apiKey "test")', async () => {
+    const service = new EmailService('test');
+
+    await expect(
+      service.sendPasswordResetEmail({
+        to: 'jane@example.com',
+        firstName: 'Jane',
+        url: 'https://tsyvinda.com/reset-password?token=abc',
+      }),
+    ).resolves.toBeUndefined();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+});

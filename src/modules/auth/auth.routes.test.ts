@@ -24,10 +24,11 @@ const { authServiceMock } = vi.hoisted(() => ({
   authServiceMock: {
     register: vi.fn(),
     confirmEmail: vi.fn(),
+    requestPasswordReset: vi.fn(),
+    resetPassword: vi.fn(),
     login: vi.fn(),
     rotateRefresh: vi.fn(),
     logout: vi.fn(),
-    getProfile: vi.fn(),
   },
 }));
 
@@ -38,7 +39,6 @@ vi.mock('./services/auth.service', () => ({
 }));
 
 import app from '../../app';
-import { signAccessToken } from './services/token.service';
 
 const samplePublicUser = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -127,6 +127,72 @@ describe('POST /auth/confirm-email', () => {
   });
 });
 
+describe('POST /auth/forgot-password', () => {
+  it('returns 200 with a generic message for a valid email', async () => {
+    authServiceMock.requestPasswordReset.mockResolvedValue(undefined);
+    const res = await request(app)
+      .post('/auth/forgot-password')
+      .send({ email: 'vlad@example.com' });
+    expect(res.status).toBe(200);
+    expect(authServiceMock.requestPasswordReset).toHaveBeenCalledWith('vlad@example.com');
+  });
+
+  it('returns 200 even for an unknown email (no enumeration)', async () => {
+    authServiceMock.requestPasswordReset.mockResolvedValue(undefined);
+    const res = await request(app)
+      .post('/auth/forgot-password')
+      .send({ email: 'nobody@example.com' });
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 400 when email is malformed', async () => {
+    const res = await request(app).post('/auth/forgot-password').send({ email: 'not-an-email' });
+    expect(res.status).toBe(400);
+    expect(authServiceMock.requestPasswordReset).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /auth/reset-password', () => {
+  it('returns 200 when token and matching passwords are valid', async () => {
+    authServiceMock.resetPassword.mockResolvedValue(undefined);
+    const token = 'a'.repeat(43);
+    const res = await request(app).post('/auth/reset-password').send({
+      token,
+      password: 'NewSecret123',
+      confirmPassword: 'NewSecret123',
+    });
+    expect(res.status).toBe(200);
+    expect(authServiceMock.resetPassword).toHaveBeenCalledWith(token, 'NewSecret123');
+  });
+
+  it('returns 400 when passwords do not match', async () => {
+    const res = await request(app).post('/auth/reset-password').send({
+      token: 'a'.repeat(43),
+      password: 'NewSecret123',
+      confirmPassword: 'Mismatch1',
+    });
+    expect(res.status).toBe(400);
+    expect(authServiceMock.resetPassword).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when password is too weak', async () => {
+    const res = await request(app).post('/auth/reset-password').send({
+      token: 'a'.repeat(43),
+      password: 'short',
+      confirmPassword: 'short',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when token is missing', async () => {
+    const res = await request(app).post('/auth/reset-password').send({
+      password: 'NewSecret123',
+      confirmPassword: 'NewSecret123',
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('POST /auth/login', () => {
   it('returns 200 + user (no accessToken in body) + sets access and refresh cookies', async () => {
     authServiceMock.login.mockResolvedValue({
@@ -156,30 +222,6 @@ describe('POST /auth/login', () => {
     expect(hasSessionCookie).toBeDefined();
     expect(hasSessionCookie).not.toMatch(/HttpOnly/i);
     expect(hasSessionCookie).toMatch(/Path=\//);
-  });
-});
-
-describe('GET /auth/me', () => {
-  it('returns 401 without an access cookie', async () => {
-    const res = await request(app).get('/auth/me');
-    expect(res.status).toBe(401);
-    expect(res.body.error.code).toBe('UNAUTHENTICATED');
-  });
-
-  it('returns 401 with a malformed access cookie', async () => {
-    const res = await request(app).get('/auth/me').set('Cookie', ['access=not-a-jwt']);
-    expect(res.status).toBe(401);
-    expect(res.body.error.code).toBe('INVALID_TOKEN');
-  });
-
-  it('returns 200 with the profile when authenticated via cookie', async () => {
-    authServiceMock.getProfile.mockResolvedValue(samplePublicUser);
-    const token = signAccessToken(samplePublicUser.id);
-
-    const res = await request(app).get('/auth/me').set('Cookie', [`access=${token}`]);
-    expect(res.status).toBe(200);
-    expect(res.body.id).toBe(samplePublicUser.id);
-    expect(authServiceMock.getProfile).toHaveBeenCalledWith(samplePublicUser.id);
   });
 });
 

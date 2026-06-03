@@ -6,8 +6,15 @@ import { logger } from '../../../shared/logger';
 import { HttpError } from '../../../shared/http-error';
 import { WelcomeEmail } from '../../../emails/WelcomeEmail';
 import { ConfirmEmail } from '../../../emails/ConfirmEmail';
+import { ResetPasswordEmail } from '../../../emails/ResetPasswordEmail';
 
 interface VerificationEmailInput {
+  to: string;
+  firstName: string;
+  url: string;
+}
+
+interface PasswordResetEmailInput {
   to: string;
   firstName: string;
   url: string;
@@ -71,6 +78,30 @@ export class EmailService {
 
     if (error) {
       throw new HttpError(502, 'EMAIL_SEND_FAILED', 'Failed to send welcome email', error);
+    }
+  }
+
+  async sendPasswordResetEmail({ to, firstName, url }: PasswordResetEmailInput): Promise<void> {
+    const element = createElement(ResetPasswordEmail, { firstName, url });
+    const html = await render(element);
+    const text = await render(element, { plainText: true });
+    const subject = 'Reset your password';
+
+    if (!this.client) {
+      logger.debug({ to, url }, 'email:reset-password (mocked)');
+      return;
+    }
+
+    const { error } = await this.client.emails.send({
+      from: config.email.from,
+      to,
+      subject,
+      html,
+      text,
+    });
+
+    if (error) {
+      throw new HttpError(502, 'EMAIL_SEND_FAILED', 'Failed to send password reset email', error);
     }
   }
 }

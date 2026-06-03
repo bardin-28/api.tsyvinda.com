@@ -39,7 +39,15 @@ const options: swaggerJsdoc.Options = {
         },
         User: {
           type: 'object',
-          required: ['id', 'firstName', 'lastName', 'email', 'emailVerified', 'createdAt'],
+          required: [
+            'id',
+            'firstName',
+            'lastName',
+            'email',
+            'emailVerified',
+            'approvedByAdmin',
+            'createdAt',
+          ],
           properties: {
             id: { type: 'string', format: 'uuid' },
             firstName: { type: 'string' },
@@ -47,6 +55,7 @@ const options: swaggerJsdoc.Options = {
             email: { type: 'string', format: 'email' },
             profileImageUrl: { type: 'string', nullable: true },
             emailVerified: { type: 'boolean' },
+            approvedByAdmin: { type: 'boolean' },
             createdAt: { type: 'string', format: 'date-time' },
           },
         },
