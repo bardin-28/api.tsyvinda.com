@@ -90,3 +90,9 @@ The env config in `src/shared/app.config.ts` uses the same `zod` pattern: schema
 - Use `docker compose` (v2, space), not `docker-compose` (v1, Python, broken on macOS).
 - Postgres major-version upgrades require dump/restore (volume data format is version-tied).
 - Don't install new packages without confirming first — check `package.json` before adding deps.
+
+## Important Notes
+
+1. **Do not refactor existing models opportunistically.** Change a model only when the current task directly requires it, and explain what changed and why in the phase summary.
+2. **Do not install new packages** without asking first. Check `package.json` before suggesting additions.
+3. **NDA-affiliated repo** — never include `Co-Authored-By` trailers or mention Anthropic/Claude in commit messages, PR descriptions, or code comments.

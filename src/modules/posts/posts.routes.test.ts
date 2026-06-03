@@ -3,10 +3,14 @@ import path from 'path';
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { userRepoMock } = vi.hoisted(() => ({
+  userRepoMock: { findOne: vi.fn() },
+}));
+
 vi.mock('../../db/database', () => ({
   AppDataSource: {
     isInitialized: true,
-    getRepository: vi.fn(),
+    getRepository: vi.fn(() => userRepoMock),
     transaction: vi.fn(),
   },
 }));
@@ -78,6 +82,8 @@ function cleanUploads(): void {
 beforeEach(() => {
   vi.clearAllMocks();
   cleanUploads();
+  // Default: the authenticated user is approved by an admin.
+  userRepoMock.findOne.mockResolvedValue({ id: AUTHOR_ID, approvedByAdmin: true });
 });
 
 afterAll(() => {
@@ -164,6 +170,20 @@ describe('POST /posts', () => {
       .field('htmlContent', '<p>body</p>');
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('SLUG_TAKEN');
+  });
+
+  it('returns 403 when the user is not approved by an admin', async () => {
+    userRepoMock.findOne.mockResolvedValue({ id: AUTHOR_ID, approvedByAdmin: false });
+    const token = signAccessToken(AUTHOR_ID);
+    const res = await request(app)
+      .post('/posts')
+      .set('Cookie', [`access=${token}`])
+      .field('title', 'Hello')
+      .field('slug', POST_SLUG)
+      .field('htmlContent', '<p>body</p>');
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('NOT_APPROVED');
+    expect(postServiceMock.create).not.toHaveBeenCalled();
   });
 });
 
@@ -260,6 +280,18 @@ describe('PATCH /posts/:id', () => {
     expect(res.body.error.code).toBe('FORBIDDEN');
   });
 
+  it('returns 403 when the user is not approved by an admin', async () => {
+    userRepoMock.findOne.mockResolvedValue({ id: AUTHOR_ID, approvedByAdmin: false });
+    const token = signAccessToken(AUTHOR_ID);
+    const res = await request(app)
+      .patch(`/posts/${POST_ID}`)
+      .set('Cookie', [`access=${token}`])
+      .field('title', 'Updated');
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('NOT_APPROVED');
+    expect(postServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it('cleans up uploaded file when validation rejects the body', async () => {
     const token = signAccessToken(AUTHOR_ID);
     const oversized = 'a'.repeat(201);
@@ -324,5 +356,16 @@ describe('DELETE /posts/:id', () => {
       .set('Cookie', [`access=${token}`]);
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('POST_NOT_FOUND');
+  });
+
+  it('returns 403 when the user is not approved by an admin', async () => {
+    userRepoMock.findOne.mockResolvedValue({ id: AUTHOR_ID, approvedByAdmin: false });
+    const token = signAccessToken(AUTHOR_ID);
+    const res = await request(app)
+      .delete(`/posts/${POST_ID}`)
+      .set('Cookie', [`access=${token}`]);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('NOT_APPROVED');
+    expect(postServiceMock.remove).not.toHaveBeenCalled();
   });
 });

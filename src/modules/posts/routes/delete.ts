@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { requireAuth } from '../../auth/middleware/is-authenticated';
+import { requireApproved } from '../../auth/middleware/requires-approval';
 import { asyncHandler } from '../../../shared/async-handler';
 import { HttpError } from '../../../shared/http-error';
 import { postService } from '../services/post.service';
@@ -40,6 +41,6 @@ async function deletePostController(req: Request, res: Response): Promise<void> 
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
-router.delete('/:id', requireAuth, asyncHandler(deletePostController));
+router.delete('/:id', requireAuth, requireApproved, asyncHandler(deletePostController));
 
 export default router;
