@@ -20,4 +20,5 @@ nginx-certs/
 coverage
 dist
 uploads
+.react-email
 .DS_Store

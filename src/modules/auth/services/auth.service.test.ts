@@ -81,7 +81,10 @@ function makeFakeDS() {
 }
 
 function makeEmail() {
-  return { sendVerificationEmail: vi.fn().mockResolvedValue(undefined) };
+  return {
+    sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
+    sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 const TEST_FRONTEND = 'https://tsyvinda.com';
@@ -165,7 +168,8 @@ describe('AuthService.register', () => {
 describe('AuthService.confirmEmail', () => {
   it('marks the user verified and consumes the token', async () => {
     const fake = makeFakeDS();
-    const service = new AuthService(fake.ds, makeEmail() as unknown as EmailService);
+    const email = makeEmail();
+    const service = new AuthService(fake.ds, email as unknown as EmailService);
 
     const user: User = {
       id: randomUUID(),
@@ -194,6 +198,10 @@ describe('AuthService.confirmEmail', () => {
     expect(updated?.emailVerified).toBe(true);
     const verification = await fake.verifications.findOne({ where: { tokenHash } });
     expect(verification?.consumedAt).toBeInstanceOf(Date);
+    expect(email.sendWelcomeEmail).toHaveBeenCalledWith({
+      to: 'c@example.com',
+      username: 'A',
+    });
   });
 
   it('throws 400 for an unknown token', async () => {
