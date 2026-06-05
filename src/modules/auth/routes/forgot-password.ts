@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { asyncHandler } from '../../../shared/async-handler';
 import { buildRateLimiter } from '../../../shared/rate-limit';
 import { validate } from '../../../shared/validate';
+import { requireTurnstile } from '../../../shared/turnstile/turnstile.middleware';
 import { forgotPasswordBodySchema, type ForgotPasswordBody } from '../entities/auth.schema';
 import { authService } from '../services/auth.service';
 
@@ -41,6 +42,7 @@ async function forgotPasswordController(req: Request, res: Response): Promise<vo
 router.post(
   '/',
   limiter,
+  requireTurnstile,
   validate({ body: forgotPasswordBodySchema }),
   asyncHandler(forgotPasswordController),
 );

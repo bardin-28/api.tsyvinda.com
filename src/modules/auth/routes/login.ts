@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { asyncHandler } from '../../../shared/async-handler';
 import { buildRateLimiter } from '../../../shared/rate-limit';
 import { validate } from '../../../shared/validate';
+import { requireTurnstile } from '../../../shared/turnstile/turnstile.middleware';
 import { loginBodySchema, type LoginBody } from '../entities/auth.schema';
 import { authService } from '../services/auth.service';
 import { clientIp, clientUserAgent, setSessionCookies } from '../shared/auth.utils';
@@ -51,6 +52,12 @@ async function loginController(req: Request, res: Response): Promise<void> {
  *         description: Email not verified
  *         content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
  */
-router.post('/', limiter, validate({ body: loginBodySchema }), asyncHandler(loginController));
+router.post(
+  '/',
+  limiter,
+  requireTurnstile,
+  validate({ body: loginBodySchema }),
+  asyncHandler(loginController),
+);
 
 export default router;

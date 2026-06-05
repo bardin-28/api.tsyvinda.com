@@ -24,6 +24,18 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
   EMAIL_FROM: z.string().min(1, 'EMAIL_FROM is required'),
   COOKIE_DOMAIN: z.string().optional(),
+  TURNSTILE_SECRET_KEY: z.string().optional(),
+}).superRefine((e, ctx) => {
+  // Cloudflare Turnstile is mandatory in production: a missing secret there means
+  // every protected endpoint would silently skip verification. Fail fast on boot
+  // instead. In development/test the secret is optional and verification is skipped.
+  if (e.NODE_ENV === 'production' && !e.TURNSTILE_SECRET_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TURNSTILE_SECRET_KEY'],
+      message: 'TURNSTILE_SECRET_KEY is required in production',
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -59,6 +71,9 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       from: e.EMAIL_FROM,
     },
     cookieDomain: e.COOKIE_DOMAIN,
+    turnstile: {
+      secretKey: e.TURNSTILE_SECRET_KEY,
+    },
   };
 }
 

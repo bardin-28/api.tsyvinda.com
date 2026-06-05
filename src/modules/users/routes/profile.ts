@@ -5,6 +5,7 @@ import { cleanupUploadOnError } from '../../../shared/cleanup-upload';
 import { HttpError } from '../../../shared/http-error';
 import { config } from '../../../shared/app.config';
 import { validate } from '../../../shared/validate';
+import { requireTurnstile } from '../../../shared/turnstile/turnstile.middleware';
 import { updateProfileSchema, type UpdateProfileBody } from '../entities/profile.schema';
 import { profileService } from '../services/profile.service';
 import { PROFILE_IMAGE_URL_PREFIX, profileImageUpload } from '../shared/upload';
@@ -122,6 +123,7 @@ router.patch(
   requireAuth,
   profileImageUpload,
   cleanupUploadOnError,
+  requireTurnstile,
   validate({ body: updateProfileSchema }),
   asyncHandler(patchProfileController),
 );
