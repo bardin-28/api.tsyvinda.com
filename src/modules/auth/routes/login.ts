@@ -38,6 +38,9 @@ async function loginController(req: Request, res: Response): Promise<void> {
  *             properties:
  *               email: { type: string, format: email }
  *               password: { type: string }
+ *               cf-turnstile-response:
+ *                 type: string
+ *                 description: Cloudflare Turnstile token. Required when Turnstile is configured; any value passes with the Cloudflare dummy secret in dev.
  *     responses:
  *       200:
  *         description: Authenticated. Access + refresh tokens issued as httpOnly cookies (`access`, `refresh`).

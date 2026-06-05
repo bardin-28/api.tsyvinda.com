@@ -33,6 +33,9 @@ async function forgotPasswordController(req: Request, res: Response): Promise<vo
  *             required: [email]
  *             properties:
  *               email: { type: string, format: email }
+ *               cf-turnstile-response:
+ *                 type: string
+ *                 description: Cloudflare Turnstile token. Required when Turnstile is configured; any value passes with the Cloudflare dummy secret in dev.
  *     responses:
  *       200:
  *         description: Generic acknowledgement (sent whether or not the email exists)
