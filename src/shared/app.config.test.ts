@@ -46,8 +46,19 @@ describe('loadConfig', () => {
   });
 
   it('flags isProd when NODE_ENV=production', () => {
-    const cfg = loadConfig({ ...baseEnv, NODE_ENV: 'production' });
+    const cfg = loadConfig({ ...baseEnv, NODE_ENV: 'production', TURNSTILE_SECRET_KEY: 'secret' });
     expect(cfg.isProd).toBe(true);
     expect(cfg.isDev).toBe(false);
+  });
+
+  it('leaves turnstile.secretKey undefined when unset in development', () => {
+    const cfg = loadConfig(baseEnv);
+    expect(cfg.turnstile.secretKey).toBeUndefined();
+  });
+
+  it('throws when TURNSTILE_SECRET_KEY missing in production', () => {
+    expect(() => loadConfig({ ...baseEnv, NODE_ENV: 'production' })).toThrow(
+      /TURNSTILE_SECRET_KEY/,
+    );
   });
 });

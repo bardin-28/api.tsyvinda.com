@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { asyncHandler } from '../../../shared/async-handler';
 import { buildRateLimiter } from '../../../shared/rate-limit';
 import { validate } from '../../../shared/validate';
+import { requireTurnstile } from '../../../shared/turnstile/turnstile.middleware';
 import { registerBodySchema, type RegisterBody } from '../entities/auth.schema';
 import { authService } from '../services/auth.service';
 
@@ -47,6 +48,12 @@ async function registerController(req: Request, res: Response): Promise<void> {
  *         description: Email already registered
  *         content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
  */
-router.post('/', limiter, validate({ body: registerBodySchema }), asyncHandler(registerController));
+router.post(
+  '/',
+  limiter,
+  requireTurnstile,
+  validate({ body: registerBodySchema }),
+  asyncHandler(registerController),
+);
 
 export default router;
