@@ -89,6 +89,7 @@ services:
       - EMAIL_FROM=${EMAIL_FROM}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
+      - TURNSTILE_BYPASS_TOKEN=${TURNSTILE_BYPASS_TOKEN:-}
     deploy:
       resources:
         limits:

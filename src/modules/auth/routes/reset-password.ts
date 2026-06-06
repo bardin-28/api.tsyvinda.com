@@ -32,6 +32,9 @@ async function resetPasswordController(req: Request, res: Response): Promise<voi
  *               token: { type: string, minLength: 32 }
  *               password: { type: string, minLength: 8, maxLength: 72 }
  *               confirmPassword: { type: string }
+ *               cf-turnstile-response:
+ *                 type: string
+ *                 description: Cloudflare Turnstile token. Required when Turnstile is configured; any value passes with the Cloudflare dummy secret in dev.
  *     responses:
  *       200:
  *         description: Password updated

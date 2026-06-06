@@ -25,6 +25,11 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().min(1, 'EMAIL_FROM is required'),
   COOKIE_DOMAIN: z.string().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
+  // Escape hatch for testing protected endpoints (e.g. Swagger /docs on
+  // production) where no real Turnstile widget is rendered. When set, sending
+  // this exact value as `cf-turnstile-response` skips Cloudflare verification.
+  // Must be a long, unguessable secret; rotate to revoke.
+  TURNSTILE_BYPASS_TOKEN: z.string().min(16).optional(),
 }).superRefine((e, ctx) => {
   // Cloudflare Turnstile is mandatory in production: a missing secret there means
   // every protected endpoint would silently skip verification. Fail fast on boot
@@ -73,6 +78,7 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     cookieDomain: e.COOKIE_DOMAIN,
     turnstile: {
       secretKey: e.TURNSTILE_SECRET_KEY,
+      bypassToken: e.TURNSTILE_BYPASS_TOKEN,
     },
   };
 }

@@ -39,6 +39,9 @@ async function registerController(req: Request, res: Response): Promise<void> {
  *               email: { type: string, format: email }
  *               password: { type: string, minLength: 8, maxLength: 72 }
  *               confirmPassword: { type: string }
+ *               cf-turnstile-response:
+ *                 type: string
+ *                 description: Cloudflare Turnstile token. Required when Turnstile is configured; any value passes with the Cloudflare dummy secret in dev.
  *     responses:
  *       201:
  *         description: Verification email sent

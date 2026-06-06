@@ -102,6 +102,9 @@ router.get('/', requireAuth, asyncHandler(getProfileController));
  *                 type: string
  *                 format: binary
  *                 description: Profile image (jpeg, png, webp, max 5MB). Mutually exclusive with `removeImage`.
+ *               cf-turnstile-response:
+ *                 type: string
+ *                 description: Cloudflare Turnstile token. Required when Turnstile is configured; any value passes with the Cloudflare dummy secret in dev.
  *     responses:
  *       200:
  *         description: Updated profile
