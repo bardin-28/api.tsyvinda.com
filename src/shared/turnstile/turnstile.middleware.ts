@@ -39,6 +39,17 @@ export async function requireTurnstile(
     return;
   }
 
+  // Bypass for testing protected endpoints without a real widget (e.g. Swagger
+  // /docs). Skips Cloudflare entirely when the token matches the configured
+  // secret. Compared before siteverify so it costs no network round-trip.
+  const bypassToken = config.turnstile.bypassToken;
+  if (bypassToken && token === bypassToken) {
+    logger.warn({ ip: req.ip }, 'Turnstile verification bypassed via configured bypass token');
+    delete body[TURNSTILE_TOKEN_FIELD];
+    next();
+    return;
+  }
+
   try {
     const result = await verifyTurnstileToken(secret, token, req.ip);
     if (!result.success) {

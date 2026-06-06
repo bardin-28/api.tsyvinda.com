@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mutable secret so individual tests can toggle the skip path.
 const configMock = {
-  turnstile: { secretKey: 'secret-key' as string | undefined },
+  turnstile: {
+    secretKey: 'secret-key' as string | undefined,
+    bypassToken: undefined as string | undefined,
+  },
   isDev: false,
   nodeEnv: 'test' as string,
 };
@@ -26,6 +29,7 @@ describe('requireTurnstile', () => {
   beforeEach(() => {
     verifyMock.mockReset();
     configMock.turnstile.secretKey = 'secret-key';
+    configMock.turnstile.bypassToken = undefined;
     configMock.isDev = false;
     configMock.nodeEnv = 'test';
   });
@@ -76,6 +80,38 @@ describe('requireTurnstile', () => {
     await requireTurnstile(req, {} as Response, next as unknown as NextFunction);
 
     expect(next.mock.calls[0]?.[0]).toMatchObject({ status: 502, code: 'TURNSTILE_UNAVAILABLE' });
+  });
+
+  it('bypasses siteverify and strips the token when token matches the bypass token', async () => {
+    configMock.turnstile.bypassToken = 'bypass-secret-token-1234';
+    const body: Record<string, unknown> = {
+      [TURNSTILE_TOKEN_FIELD]: 'bypass-secret-token-1234',
+      email: 'a@b.com',
+    };
+    const req = { body, ip: '9.9.9.9' } as unknown as Request;
+    const next = vi.fn();
+
+    await requireTurnstile(req, {} as Response, next as unknown as NextFunction);
+
+    expect(next).toHaveBeenCalledWith();
+    expect(verifyMock).not.toHaveBeenCalled();
+    expect(body[TURNSTILE_TOKEN_FIELD]).toBeUndefined();
+    expect(body.email).toBe('a@b.com');
+  });
+
+  it('still verifies when a bypass token is set but the value does not match', async () => {
+    configMock.turnstile.bypassToken = 'bypass-secret-token-1234';
+    verifyMock.mockResolvedValue({ success: true, errorCodes: [] });
+    const req = {
+      body: { [TURNSTILE_TOKEN_FIELD]: 'real-widget-token' },
+      ip: '9.9.9.9',
+    } as unknown as Request;
+    const next = vi.fn();
+
+    await requireTurnstile(req, {} as Response, next as unknown as NextFunction);
+
+    expect(next).toHaveBeenCalledWith();
+    expect(verifyMock).toHaveBeenCalledWith('secret-key', 'real-widget-token', '9.9.9.9');
   });
 
   it('calls next() and strips the token from the body on success', async () => {
