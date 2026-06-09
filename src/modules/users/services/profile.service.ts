@@ -1,7 +1,8 @@
 import { unlink } from 'fs/promises';
 import path from 'path';
-import type { DataSource, Repository } from 'typeorm';
-import { AppDataSource } from '../../../db/database';
+import { Injectable } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { type DataSource, type Repository } from 'typeorm';
 import { HttpError } from '../../../shared/http-error';
 import { toPublicUser, type PublicUser } from '../../auth/services/auth.service';
 import { User } from '../entities/user.entity';
@@ -13,8 +14,9 @@ export interface UpdateProfileInput {
   profileImageUrl?: string | null;
 }
 
+@Injectable()
 export class ProfileService {
-  constructor(private readonly ds: DataSource = AppDataSource) {}
+  constructor(@InjectDataSource() private readonly ds: DataSource) {}
 
   private get users(): Repository<User> {
     return this.ds.getRepository(User);
@@ -42,11 +44,7 @@ export class ProfileService {
 
     await this.users.save(user);
 
-    if (
-      patch.profileImageUrl !== undefined &&
-      prevImage &&
-      prevImage !== patch.profileImageUrl
-    ) {
+    if (patch.profileImageUrl !== undefined && prevImage && prevImage !== patch.profileImageUrl) {
       void deletePriorImage(prevImage);
     }
 
@@ -63,5 +61,3 @@ async function deletePriorImage(prevUrl: string): Promise<void> {
     // best-effort cleanup
   }
 }
-
-export const profileService = new ProfileService();
