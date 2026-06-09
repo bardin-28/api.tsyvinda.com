@@ -71,6 +71,7 @@ export function decodeCursor(raw: string): Cursor {
   } catch {
     throw new HttpError(400, 'INVALID_CURSOR', 'Cursor is not decodable');
   }
+
   if (
     !parsed ||
     typeof parsed !== 'object' ||
@@ -79,7 +80,9 @@ export function decodeCursor(raw: string): Cursor {
   ) {
     throw new HttpError(400, 'INVALID_CURSOR', 'Cursor payload is malformed');
   }
+
   const c = parsed as Cursor;
+
   if (Number.isNaN(Date.parse(c.createdAt))) {
     throw new HttpError(400, 'INVALID_CURSOR', 'Cursor createdAt is not a valid date');
   }
@@ -123,13 +126,17 @@ export class PostService {
 
   async create(authorId: string, input: CreatePostInput): Promise<PublicPost> {
     const author = await this.users.findOne({ where: { id: authorId } });
+
     if (!author) {
       throw new HttpError(404, 'USER_NOT_FOUND', 'Author not found');
     }
+
     const slugTaken = await this.posts.findOne({ where: { slug: input.slug } });
+
     if (slugTaken) {
       throw new HttpError(409, 'SLUG_TAKEN', 'Slug already in use');
     }
+
     const post = this.posts.create({
       title: input.title,
       slug: input.slug,
@@ -138,6 +145,7 @@ export class PostService {
       imageUrl: input.imageUrl ?? null,
       authorId,
     });
+
     const saved = await this.posts.save(post);
     return toPublicPost(saved, author);
   }
@@ -152,6 +160,7 @@ export class PostService {
 
     if (input.cursor) {
       const cursor = decodeCursor(input.cursor);
+
       qb.where('(post.createdAt < :cAt OR (post.createdAt = :cAt AND post.id < :cId))', {
         cAt: cursor.createdAt,
         cId: cursor.id,
