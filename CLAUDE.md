@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - TypeORM 0.3 (decorators) on PostgreSQL 18 via `@nestjs/typeorm`
 - ioredis on Redis 8 (wrapped as a Nest provider; also backs the throttler)
 - `@nestjs/swagger` (decorator-generated OpenAPI) on `/docs`
+- React Email templates (`src/emails/*.tsx`) rendered via `@react-email/render`, sent through Resend
 - Vitest (node env)
 
 ## Commands
@@ -22,7 +23,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `npm run lint` / `lint:fix`       | ESLint flat config                                       |
 | `npm run format` / `format:check` | Prettier                                                 |
 | `npm run test` / `test:watch`     | Vitest                                                   |
-| `npm run cert`                    | mkcert TLS pair (reads `BACKEND_HOST` from `.env.local`) |
+| `npm run test:coverage`           | Vitest + v8 coverage                                     |
+| `npm run email:dev`               | React-email preview server (`src/emails`, port 3001)     |
+| `npm run db:migration:generate` / `run` / `revert` | TypeORM CLI (`-d src/db/database.ts`); `:run:prod` / `:revert:prod` use `dist/` |
+| `npm run cert`                    | mkcert TLS pair (reads `BACKEND_HOST` from `.env`)       |
 
 Single test: `npx vitest run path/to/file.test.ts` or `-t "<name>"`.
 
@@ -44,6 +48,7 @@ src/
   redis/
     redis.ts        ioredis client + error logger
     redis.module.ts Global Nest provider (REDIS token) + onApplicationShutdown quit
+  emails/           React-email .tsx templates (Welcome, ConfirmEmail, ResetPassword) — rendered + sent by auth EmailService
   shared/           app.config (env, zod), logger, http-error, all-exceptions.filter, validation-exception.factory,
                     upload-options (multer config for FileInterceptor), dto-transforms, cleanup-upload.interceptor,
                     swagger/ (response DTOs), validators/ (@IsMatch), turnstile/ (service + interceptor + constants)
@@ -103,7 +108,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 - Vitest, node env. Test files colocated as `*.test.ts` (root or inside modules).
 - HTTP tests boot a Nest app via `@nestjs/testing` (`Test.createTestingModule(...).createNestApplication()`) + supertest; stub guards with `.overrideGuard(...)`, services with `useValue`.
 - **New features require Vitest tests.** Cover the controller/service.
-- CI runs the chain `format:check → lint → typecheck → build → test` (`.github/workflows/ci.yml`). Run `npm run typecheck && npm test` locally before pushing.
+- CI runs `build → test` (`.github/workflows/ci.yml`). `format:check`/`lint`/`typecheck` are local-only — run `npm run typecheck && npm test` before pushing.
 
 ## Git workflow
 
