@@ -22,6 +22,8 @@ import { PostsModule } from './modules/posts/posts.module';
       useFactory: (redis: Redis) => ({
         throttlers: [{ ttl: 60_000, limit: 100 }],
         storage: new ThrottlerStorageRedisService(redis),
+        // Don't leak rate-limit state to clients (no X-RateLimit-*/Retry-After headers)
+        setHeaders: false,
       }),
     }),
     HealthModule,
