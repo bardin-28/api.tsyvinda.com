@@ -3,7 +3,7 @@ ARG BUILD_JOBS=1
 FROM node:22-alpine AS base
 WORKDIR /app
 ARG BUILD_JOBS
-ENV MAKEFLAGS="-j${BUILD_JOBS}" UV_THREADPOOL_SIZE=${BUILD_JOBS} NODE_OPTIONS="--max-old-space-size=640"
+ENV MAKEFLAGS="-j${BUILD_JOBS}" UV_THREADPOOL_SIZE=${BUILD_JOBS} NODE_OPTIONS="--max-old-space-size=1024"
 COPY package*.json ./
 
 FROM base AS development
@@ -15,7 +15,7 @@ CMD ["npm", "run", "dev"]
 FROM base AS builder
 RUN npm ci --include=dev --ignore-scripts --no-audit --no-fund
 COPY . .
-RUN nice -n 19 npm run build
+RUN nice -n 10 npm run build
 
 FROM node:22-alpine AS production
 ENV NODE_ENV=production
