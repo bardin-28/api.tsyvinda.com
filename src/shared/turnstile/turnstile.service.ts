@@ -16,7 +16,10 @@ export interface TurnstileResult {
 // not be reached / returned garbage" (service unavailable). The middleware maps
 // these to different HTTP statuses (403 vs 502).
 export class TurnstileUnavailableError extends Error {
-  constructor(message: string, readonly cause?: unknown) {
+  constructor(
+    message: string,
+    readonly cause?: unknown,
+  ) {
     super(message);
     this.name = 'TurnstileUnavailableError';
   }

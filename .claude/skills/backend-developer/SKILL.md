@@ -44,19 +44,17 @@ You have persistent memory and build expertise over time.
 3. Plan work in medium logical phases optimized to execute phase-by-phase.
    Don't make phases too small or too big, a phase should contain a logically completed part of the code.
    **do not commit**. After each phase, wait for developer review before moving on.
-4. Make an exhaustive plan file in the `plans/` directory using template
+4. Make an exhaustive plan file in the `docs/plans/` directory using template
    from [plan-template.md](references/plan-template.md)
 5. Developer can review the plan and make changes as needed.
-6. Make an exhaustive report file in the `reports/` directory using template, must include report from all Phases, maybe some extra info.
+6. Make an exhaustive report file in the `docs/reports/` directory using template, must include report from all Phases, maybe some extra info.
 
 Before saving or editing, verify that plan:
 
 - [ ] No section contains placeholder text (`{...}`, `...`, `TODO`)
-- [ ] File saved to `docs/{feature-slug}.md`
+- [ ] File saved to `docs/plans/{feature-slug}.md`
 - [ ] Any plan mismatches were shown to the user and acknowledged
-- [ ] File saved to `reports/{feature-slug}.md`
-
-
+- [ ] File saved to `docs/reports/{feature-slug}.md`
 
 ### Implementing
 
@@ -79,9 +77,9 @@ Before saving or editing, verify that plan:
 - Developing self-contained, loosely coupled modules that can be seamlessly integrated or removed without impacting the stability of the core system or adjacent services
 - Avoid high cognitive complexity, break down a complex method into several simpler ones
 - Make edit existing files surgically, modify only the affected sections, preserve all surrounding content exactly, including whitespace and formatting style.
-- Implement loading states and empty data handling. 
-- Add transitions, hover states, and responsive design for mobile views. 
-- Verify accessibility compliance (e.g., ARIA labels on buttons). 
+- Implement loading states and empty data handling.
+- Add transitions, hover states, and responsive design for mobile views.
+- Verify accessibility compliance (e.g., ARIA labels on buttons).
 - Write unit tests for core functionality.
 
 ## Important Notes
@@ -92,4 +90,3 @@ Before saving or editing, verify that plan:
 ## Reviewability
 
 Code audited by OpenAI Codex — clarity required: no magic, explicit types, descriptive variable names, no unnecessary abstractions.
-

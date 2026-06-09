@@ -1,10 +1,11 @@
+import { Injectable } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { IsNull, type DataSource, type Repository } from 'typeorm';
 import { config } from '../../../shared/app.config';
-import { AppDataSource } from '../../../db/database';
 import { HttpError } from '../../../shared/http-error';
 import { logger } from '../../../shared/logger';
 import { User } from '../../users/entities/user.entity';
-import { EmailService, emailService } from './email.service';
+import { EmailService } from './email.service';
 import { EmailVerification } from '../entities/email-verification.entity';
 import { PasswordReset } from '../entities/password-reset.entity';
 import { hashPassword, verifyPassword } from './crypto.service';
@@ -53,10 +54,11 @@ export interface AuthSessionResult {
   user: PublicUser;
 }
 
+@Injectable()
 export class AuthService {
   constructor(
-    private readonly ds: DataSource = AppDataSource,
-    private readonly email: EmailService = emailService,
+    @InjectDataSource() private readonly ds: DataSource,
+    private readonly email: EmailService,
   ) {}
 
   private get users(): Repository<User> {
@@ -338,5 +340,3 @@ export function toPublicUser(user: User): PublicUser {
     createdAt: user.createdAt,
   };
 }
-
-export const authService = new AuthService();

@@ -24,14 +24,14 @@ How to verify the `/auth/*` flow end-to-end against a local dev stack and agains
 
 Six endpoints — happy path + the obvious failure modes:
 
-| Method | Path                  | Auth            | Success | Common failures                                                |
-| ------ | --------------------- | --------------- | ------- | -------------------------------------------------------------- |
-| POST   | `/auth/register`      | —               | 201     | 400 validation, 409 email taken                                |
-| POST   | `/auth/confirm-email` | —               | 200     | 400 invalid/expired/consumed token                             |
-| POST   | `/auth/login`         | —               | 200     | 400 validation, 401 invalid creds, 403 email-not-verified      |
-| POST   | `/auth/refresh`       | `refresh` cookie | 200    | 401 missing/invalid/expired/reused refresh                     |
-| POST   | `/auth/logout`        | `refresh` cookie | 204    | —                                                              |
-| GET    | `/auth/me`            | `access` cookie  | 200    | 401 missing/invalid/expired access token                       |
+| Method | Path                  | Auth             | Success | Common failures                                           |
+| ------ | --------------------- | ---------------- | ------- | --------------------------------------------------------- |
+| POST   | `/auth/register`      | —                | 201     | 400 validation, 409 email taken                           |
+| POST   | `/auth/confirm-email` | —                | 200     | 400 invalid/expired/consumed token                        |
+| POST   | `/auth/login`         | —                | 200     | 400 validation, 401 invalid creds, 403 email-not-verified |
+| POST   | `/auth/refresh`       | `refresh` cookie | 200     | 401 missing/invalid/expired/reused refresh                |
+| POST   | `/auth/logout`        | `refresh` cookie | 204     | —                                                         |
+| GET    | `/auth/me`            | `access` cookie  | 200     | 401 missing/invalid/expired access token                  |
 
 State you should see in the DB after a full happy path:
 
@@ -228,23 +228,23 @@ ORDER BY created_at DESC;
 
 Run each via Swagger or curl. All should be the listed status code with a structured `{ error: { code, message, requestId } }` body.
 
-| What                                                | Expected                          |
-| --------------------------------------------------- | --------------------------------- |
-| Register with `password=short`                      | `400` `VALIDATION_FAILED`         |
-| Register with `password !== confirmPassword`        | `400` `VALIDATION_FAILED`         |
-| Register with malformed email                       | `400` `VALIDATION_FAILED`         |
-| Register twice with the same email                  | `409` `EMAIL_TAKEN`               |
-| `confirm-email` with junk token (32+ chars)         | `400` `INVALID_TOKEN`             |
-| `confirm-email` with the same valid token twice     | `200` first, `200` second within 1h (idempotent), `400` after |
-| Login with wrong password                           | `401` `INVALID_CREDENTIALS`       |
-| Login with unknown email                            | `401` `INVALID_CREDENTIALS` (enumeration-safe) |
-| Login before email confirmation                     | `403` `EMAIL_NOT_VERIFIED`        |
-| `/auth/me` with no `access` cookie                  | `401` `UNAUTHENTICATED`           |
-| `/auth/me` with `Cookie: access=junk`               | `401` `INVALID_TOKEN`             |
-| `/auth/refresh` with no `refresh` cookie            | `401` `UNAUTHENTICATED`           |
-| `/auth/refresh` twice with the same old refresh     | `401` `REFRESH_REUSE` (chain revoked) |
-| 11 rapid register calls in <60s from same IP        | `429` on the 11th                  |
-| 11 rapid login calls in <60s from same IP           | `429` on the 11th                  |
+| What                                            | Expected                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| Register with `password=short`                  | `400` `VALIDATION_FAILED`                                     |
+| Register with `password !== confirmPassword`    | `400` `VALIDATION_FAILED`                                     |
+| Register with malformed email                   | `400` `VALIDATION_FAILED`                                     |
+| Register twice with the same email              | `409` `EMAIL_TAKEN`                                           |
+| `confirm-email` with junk token (32+ chars)     | `400` `INVALID_TOKEN`                                         |
+| `confirm-email` with the same valid token twice | `200` first, `200` second within 1h (idempotent), `400` after |
+| Login with wrong password                       | `401` `INVALID_CREDENTIALS`                                   |
+| Login with unknown email                        | `401` `INVALID_CREDENTIALS` (enumeration-safe)                |
+| Login before email confirmation                 | `403` `EMAIL_NOT_VERIFIED`                                    |
+| `/auth/me` with no `access` cookie              | `401` `UNAUTHENTICATED`                                       |
+| `/auth/me` with `Cookie: access=junk`           | `401` `INVALID_TOKEN`                                         |
+| `/auth/refresh` with no `refresh` cookie        | `401` `UNAUTHENTICATED`                                       |
+| `/auth/refresh` twice with the same old refresh | `401` `REFRESH_REUSE` (chain revoked)                         |
+| 11 rapid register calls in <60s from same IP    | `429` on the 11th                                             |
+| 11 rapid login calls in <60s from same IP       | `429` on the 11th                                             |
 
 After a `REFRESH_REUSE`, all of that user's refresh rows should have `revoked_at` set — verify with the SQL query above.
 

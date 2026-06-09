@@ -17,6 +17,7 @@ Create a new feature module at `src/modules/<name>/` that matches the existing p
 1. **Confirm the name doesn't collide.** `ls src/modules/` — if `<name>/` exists, ask before proceeding.
 
 2. **Create `src/modules/<name>/<name>.controller.ts`** — one handler stub:
+
    ```ts
    import { Request, Response } from 'express';
 
@@ -24,9 +25,11 @@ Create a new feature module at `src/modules/<name>/` that matches the existing p
      res.json({ items: [] });
    }
    ```
+
    Replace `<Name>` with PascalCase of `<name>`.
 
 3. **Create `src/modules/<name>/<name>.routes.ts`** — `Router` with the swagger JSDoc block above the route (must be on this file; that's where the swagger glob looks):
+
    ```ts
    import { Router } from 'express';
    import { list<Name> } from './<name>.controller';

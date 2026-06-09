@@ -1,7 +1,8 @@
 import { unlink } from 'fs/promises';
 import path from 'path';
-import type { DataSource, Repository } from 'typeorm';
-import { AppDataSource } from '../../../db/database';
+import { Injectable } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { type DataSource, type Repository } from 'typeorm';
 import { HttpError } from '../../../shared/http-error';
 import { User } from '../../users/entities/user.entity';
 import { Post } from '../entities/post.entity';
@@ -108,8 +109,9 @@ export function toPublicPost(post: Post, author: User): PublicPost {
   };
 }
 
+@Injectable()
 export class PostService {
-  constructor(private readonly ds: DataSource = AppDataSource) {}
+  constructor(@InjectDataSource() private readonly ds: DataSource) {}
 
   private get posts(): Repository<Post> {
     return this.ds.getRepository(Post);
@@ -240,5 +242,3 @@ async function safeUnlinkByUrl(url: string): Promise<void> {
     // best-effort
   }
 }
-
-export const postService = new PostService();

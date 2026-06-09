@@ -48,7 +48,5 @@
   "sandbox": {
     "enabled": true
   },
-  "additionalDirectories": [
-    "../test-fe"
-  ]
+  "additionalDirectories": ["../test-fe"]
 }

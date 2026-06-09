@@ -477,14 +477,14 @@ Email + password authentication with email confirmation via Resend. Both access 
 
 ### Endpoints
 
-| Method | Path                  | Auth         | Purpose                                                          |
-| ------ | --------------------- | ------------ | ---------------------------------------------------------------- |
-| POST   | `/auth/register`      | —            | Create account; sends Resend verification email                  |
-| POST   | `/auth/confirm-email` | —            | Confirm email using the token from the email link                |
-| POST   | `/auth/login`         | —            | Sets `access` + `refresh` cookies; body returns `{ user }`       |
-| POST   | `/auth/refresh`       | refresh cookie | Rotates both cookies; body returns `{ user }`                  |
-| POST   | `/auth/logout`        | refresh cookie | Revokes refresh, clears both cookies                           |
-| GET    | `/auth/me`            | access cookie | Returns the authenticated user's profile                        |
+| Method | Path                  | Auth           | Purpose                                                    |
+| ------ | --------------------- | -------------- | ---------------------------------------------------------- |
+| POST   | `/auth/register`      | —              | Create account; sends Resend verification email            |
+| POST   | `/auth/confirm-email` | —              | Confirm email using the token from the email link          |
+| POST   | `/auth/login`         | —              | Sets `access` + `refresh` cookies; body returns `{ user }` |
+| POST   | `/auth/refresh`       | refresh cookie | Rotates both cookies; body returns `{ user }`              |
+| POST   | `/auth/logout`        | refresh cookie | Revokes refresh, clears both cookies                       |
+| GET    | `/auth/me`            | access cookie  | Returns the authenticated user's profile                   |
 
 ### Token model
 

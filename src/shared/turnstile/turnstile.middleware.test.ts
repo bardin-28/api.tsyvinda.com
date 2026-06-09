@@ -1,21 +1,26 @@
 import type { NextFunction, Request, Response } from 'express';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mutable secret so individual tests can toggle the skip path.
-const configMock = {
-  turnstile: {
-    secretKey: 'secret-key' as string | undefined,
-    bypassToken: undefined as string | undefined,
-  },
-  isDev: false,
-  nodeEnv: 'test' as string,
-};
+// Mutable secret so individual tests can toggle the skip path. Defined via
+// vi.hoisted so the hoisted vi.mock factories below can reference them safely
+// (the SWC transform enforces TDZ on plain top-level consts).
+const { configMock, verifyMock, TurnstileUnavailableError } = vi.hoisted(() => {
+  class TurnstileUnavailableError extends Error {}
+  return {
+    configMock: {
+      turnstile: {
+        secretKey: 'secret-key' as string | undefined,
+        bypassToken: undefined as string | undefined,
+      },
+      isDev: false,
+      nodeEnv: 'test' as string,
+    },
+    verifyMock: vi.fn(),
+    TurnstileUnavailableError,
+  };
+});
 
 vi.mock('../app.config', () => ({ config: configMock }));
-
-const verifyMock = vi.fn();
-
-class TurnstileUnavailableError extends Error {}
 
 vi.mock('./turnstile.service', () => ({
   verifyTurnstileToken: (...args: unknown[]) => verifyMock(...args),

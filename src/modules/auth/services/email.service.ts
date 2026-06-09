@@ -1,4 +1,5 @@
 import { createElement } from 'react';
+import { Injectable } from '@nestjs/common';
 import { render } from '@react-email/render';
 import { Resend } from 'resend';
 import { config } from '../../../shared/app.config';
@@ -25,6 +26,9 @@ interface WelcomeEmailInput {
   username: string;
 }
 
+// Provided in AuthModule via useFactory (the primitive apiKey constructor param
+// cannot be resolved by Nest DI), so it is constructed without arguments at runtime.
+@Injectable()
 export class EmailService {
   private readonly client: Resend | null;
 
@@ -105,5 +109,3 @@ export class EmailService {
     }
   }
 }
-
-export const emailService = new EmailService();
