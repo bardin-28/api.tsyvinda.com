@@ -7,8 +7,6 @@ volumes:
   nginx-vhost:
   postgres-data:
   redis-data:
-  profile-uploads:
-  post-uploads:
 
 x-logging: &default-logging
   driver: json-file
@@ -37,6 +35,8 @@ services:
       - nginx-html:/usr/share/nginx/html
       - nginx-vhost:/etc/nginx/vhost.d
       - ./docker/nginx-proxy/custom.conf:/etc/nginx/conf.d/custom.conf:ro
+      # Local-only: expose MiniStack S3 under https://api.tsyvinda.local/s3/...
+      - ./docker/nginx-proxy/api.tsyvinda.local_location:/etc/nginx/vhost.d/api.tsyvinda.local_location:ro
     networks:
       - app-backend
 
@@ -66,10 +66,19 @@ services:
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
       - TURNSTILE_BYPASS_TOKEN=${TURNSTILE_BYPASS_TOKEN:-}
+      # S3 → in-network MiniStack. S3_ENDPOINT = the compose service (PUT/DELETE target).
+      # S3_PUBLIC_URL (stored in image URLs) is served by nginx-proxy at
+      # https://api.tsyvinda.local/s3/... — the bucket is injected server-side in
+      # docker/nginx-proxy/api.tsyvinda.local_location, so it stays out of the URL.
+      - S3_ENDPOINT=http://ministack:4566
+      - S3_BUCKET=${S3_BUCKET:-tsyvinda-local}
+      - S3_REGION=${S3_REGION:-eu-central-1}
+      - S3_PUBLIC_URL=https://api.tsyvinda.local/s3
+      - S3_ACCESS_KEY_ID=test
+      - S3_SECRET_ACCESS_KEY=test
+      - S3_FORCE_PATH_STYLE=true
     volumes:
       - ./src:/app/src
-      - profile-uploads:/app/uploads/profile
-      - post-uploads:/app/uploads/posts
     networks:
       - app-backend
     healthcheck:
@@ -83,6 +92,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ministack:
+        condition: service_started
 
   postgres:
     image: postgres:18.4-alpine
@@ -119,3 +130,35 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Local S3 (dev only). Real AWS S3 in prod. MiniStack = MIT LocalStack-compatible,
+  # tiny footprint (~30MB). Bucket created by the s3-init one-shot below.
+  ministack:
+    image: ministackorg/ministack:latest
+    restart: ${RESTART_POLICY:-no}
+    logging: *default-logging
+    ports:
+      - '127.0.0.1:4566:4566'
+    networks:
+      - app-backend
+
+  # One-shot: wait for MiniStack, create the dev bucket + public-read policy, exit.
+  s3-init:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - ministack
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=${S3_REGION:-eu-central-1}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        until aws --endpoint-url=http://ministack:4566 s3 ls >/dev/null 2>&1; do
+          echo "waiting for ministack..."; sleep 2;
+        done
+        aws --endpoint-url=http://ministack:4566 s3 mb "s3://${S3_BUCKET:-tsyvinda-local}" || true
+        aws --endpoint-url=http://ministack:4566 s3api put-bucket-policy --bucket "${S3_BUCKET:-tsyvinda-local}" --policy '{"Version":"2012-10-17","Statement":[{"Sid":"PublicRead","Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"arn:aws:s3:::${S3_BUCKET:-tsyvinda-local}/*"}]}'
+        echo "bucket ready"
+    networks:
+      - app-backend

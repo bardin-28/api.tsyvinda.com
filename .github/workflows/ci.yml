@@ -18,3 +18,47 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+
+  # GitOps deploy: build → push ECR (keyless OIDC) → bump image tag in the infra
+  # repo. CI never touches the cluster — ArgoCD reconciles the tag commit.
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # assume the AWS deploy role via OIDC
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          docker build --target production -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      # Bump the prod image tag in the infra repo → ArgoCD picks it up.
+      - name: Checkout infra repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.INFRA_REPOSITORY }}
+          token: ${{ secrets.INFRA_REPO_TOKEN }}
+          path: infra
+
+      - name: Bump backend image tag
+        working-directory: infra
+        run: |
+          yq -i '.image.tag = "${{ github.sha }}"' helm/backend/values-prod.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "deploy(backend): ${{ github.sha }}"
+          git push
