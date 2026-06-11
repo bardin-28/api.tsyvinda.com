@@ -7,6 +7,7 @@ import type { Request } from 'express';
 import request from 'supertest';
 import { PostsController } from './posts.controller';
 import { PostService } from './services/post.service';
+import { S3Service } from '../../shared/s3/s3.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { ApprovedGuard } from '../auth/guards/approved.guard';
 import { AllExceptionsFilter } from '../../shared/all-exceptions.filter';
@@ -18,6 +19,11 @@ const postsMock = {
   create: vi.fn().mockResolvedValue({ id: 'p1' }),
   update: vi.fn().mockResolvedValue({ id: 'p1' }),
   remove: vi.fn().mockResolvedValue(undefined),
+};
+
+const s3Mock = {
+  put: vi.fn().mockResolvedValue('https://s3.example/posts/x.jpg'),
+  deleteByUrl: vi.fn().mockResolvedValue(undefined),
 };
 
 const setUser = {
@@ -32,7 +38,10 @@ let app: NestExpressApplication;
 beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({
     controllers: [PostsController],
-    providers: [{ provide: PostService, useValue: postsMock }],
+    providers: [
+      { provide: PostService, useValue: postsMock },
+      { provide: S3Service, useValue: s3Mock },
+    ],
   })
     .overrideGuard(AuthGuard)
     .useValue(setUser)
@@ -90,6 +99,36 @@ describe('POST /posts', () => {
       'u1',
       expect.objectContaining({ slug: 'my-post', imageUrl: null }),
     );
+  });
+
+  it('uploads an image to S3 and passes the returned URL', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/posts')
+      .field('title', 'T')
+      .field('slug', 'my-post')
+      .field('htmlContent', '<p>hi</p>')
+      .attach('image', Buffer.from('img-bytes'), { filename: 'x.png', contentType: 'image/png' });
+    expect(res.status).toBe(201);
+    expect(s3Mock.put).toHaveBeenCalledWith(
+      expect.stringMatching(/^posts\/[0-9a-f-]+\.png$/),
+      expect.any(Buffer),
+      'image/png',
+    );
+    expect(postsMock.create).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ imageUrl: 'https://s3.example/posts/x.jpg' }),
+    );
+  });
+
+  it('rejects a non-image upload', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/posts')
+      .field('title', 'T')
+      .field('slug', 'my-post')
+      .field('htmlContent', '<p>hi</p>')
+      .attach('image', Buffer.from('nope'), { filename: 'x.txt', contentType: 'text/plain' });
+    expect(res.status).toBe(400);
+    expect(s3Mock.put).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid slug', async () => {

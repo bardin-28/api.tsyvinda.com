@@ -40,7 +40,7 @@ Single test: `npx vitest run path/to/file.test.ts` or `-t "<name>"`.
 ```
 src/
   index.ts          Boot: NestFactory.create(AppModule) → helmet/cors/cookieParser/pinoHttp via app.use,
-                    useStaticAssets, global filter + ValidationPipe, SwaggerModule, enableShutdownHooks, listen
+                    global filter + ValidationPipe, SwaggerModule, enableShutdownHooks, listen
   app.module.ts     Root module: TypeOrmModule.forRoot + RedisModule + ThrottlerModule (+ global ThrottlerGuard) + feature modules
   db/
     database.ts     dataSourceOptions (shared by TypeOrmModule.forRoot and the migration-CLI AppDataSource)
@@ -50,7 +50,8 @@ src/
     redis.module.ts Global Nest provider (REDIS token) + onApplicationShutdown quit
   emails/           React-email .tsx templates (Welcome, ConfirmEmail, ResetPassword) — rendered + sent by auth EmailService
   shared/           app.config (env, zod), logger, http-error, all-exceptions.filter, validation-exception.factory,
-                    upload-options (multer config for FileInterceptor), dto-transforms, cleanup-upload.interceptor,
+                    upload-options (multer memoryStorage config for FileInterceptor), dto-transforms,
+                    s3/ (S3Service + global S3Module — image uploads to MiniStack/AWS S3),
                     swagger/ (response DTOs), validators/ (@IsMatch), turnstile/ (service + interceptor + constants)
   modules/<name>/   Feature module — see pattern below
 ```
@@ -85,7 +86,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 - **Errors**: one global `AllExceptionsFilter` maps `HttpError`, Nest `HttpException` (incl. 404 → `NOT_FOUND`), `MulterError` (413/400), and unknown → 500, all to `{ error: { code, message, details?, requestId? } }`. `requestId` comes from pino-http's `req.id`.
 - **Auth**: `@UseGuards(AuthGuard)` (reads `access` cookie, verifies JWT) and `ApprovedGuard` (DB approval check); read the user with `@CurrentUser()`.
 - **Rate limit**: `@nestjs/throttler` + `@nest-lab/throttler-storage-redis`. Global default 100/60s via `ThrottlerGuard`; per-route overrides with `@Throttle({ default: { limit, ttl } })`.
-- **File upload**: `FileInterceptor('image', imageUploadOptions(dir))` (multer disk storage in `src/shared/upload-options.ts`) + `CleanupUploadInterceptor` (unlink on error).
+- **File upload**: `FileInterceptor('image', imageUploadMemoryOptions())` (multer **memoryStorage** in `src/shared/upload-options.ts`). The handler streams `file.buffer` to `S3Service.put(key, buffer, mime)` (`posts/<uuid>.<ext>` / `profile/<uuid>.<ext>`) and stores the returned public URL. Old objects are removed via `S3Service.deleteByUrl` in the service layer (no disk, no `CleanupUploadInterceptor`). Local = MiniStack, prod = AWS S3 (see `src/shared/s3/`).
 - **Turnstile**: `TurnstileInterceptor`. On multipart routes it MUST be listed **after** `FileInterceptor` (multer populates `req.body` in its interceptor phase, which runs after guards).
 
 ## Code Style

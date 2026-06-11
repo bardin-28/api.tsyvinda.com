@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Patch,
   UploadedFile,
@@ -9,24 +10,26 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiCookieAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { config } from '../../shared/app.config';
+import { randomUUID } from 'crypto';
 import { UserDto } from '../auth/dto/user.response';
 import { HttpError } from '../../shared/http-error';
-import { imageUploadOptions } from '../../shared/upload-options';
-import { CleanupUploadInterceptor } from '../../shared/cleanup-upload.interceptor';
+import { extForMime, imageUploadMemoryOptions } from '../../shared/upload-options';
+import { S3Service } from '../../shared/s3/s3.service';
 import { TurnstileInterceptor } from '../../shared/turnstile/turnstile.interceptor';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/decorators/current-user.decorator';
 import { ProfileService } from './services/profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { PROFILE_IMAGE_URL_PREFIX, UPLOAD_DIR } from './shared/upload';
 
 @ApiTags('Profile')
 @ApiCookieAuth('cookieAuth')
 @Controller('profile')
 @UseGuards(AuthGuard)
 export class UsersController {
-  constructor(private readonly profiles: ProfileService) {}
+  constructor(
+    private readonly profiles: ProfileService,
+    private readonly s3: S3Service,
+  ) {}
 
   @Get()
   @ApiOkResponse({ type: UserDto })
@@ -34,46 +37,42 @@ export class UsersController {
     return this.profiles.get(user.id);
   }
 
-  // Interceptor order matters: FileInterceptor populates req.body/req.file first,
-  // then cleanup binds its error listeners, then Turnstile reads the parsed body.
+  // Interceptor order matters: FileInterceptor populates req.body/req.file first
+  // (memory storage), then Turnstile reads the parsed body. Sending a new `image`
+  // replaces the existing one; the previous object is deleted in the service layer.
+  // Clearing the image is a separate DELETE /profile/image call.
   @Patch()
   @ApiOkResponse({ type: UserDto })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('image', imageUploadOptions(UPLOAD_DIR)),
-    CleanupUploadInterceptor,
-    TurnstileInterceptor,
-  )
-  update(
+  @UseInterceptors(FileInterceptor('image', imageUploadMemoryOptions()), TurnstileInterceptor)
+  async update(
     @CurrentUser() user: AuthUser,
     @Body() dto: UpdateProfileDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const wantsRemove = dto.removeImage === 'true';
-
-    if (file && wantsRemove) {
-      throw new HttpError(
-        400,
-        'VALIDATION_FAILED',
-        'Cannot upload and remove image at the same time',
-      );
-    }
-
-    if (dto.firstName === undefined && dto.lastName === undefined && !file && !wantsRemove) {
+    if (dto.firstName === undefined && dto.lastName === undefined && !file) {
       throw new HttpError(400, 'VALIDATION_FAILED', 'At least one field is required');
     }
 
-    let profileImageUrl: string | null | undefined;
-    if (file) {
-      profileImageUrl = `https://${config.backendHost}${PROFILE_IMAGE_URL_PREFIX}/${file.filename}`;
-    } else if (wantsRemove) {
-      profileImageUrl = null;
-    }
+    const profileImageUrl = file
+      ? await this.s3.put(
+          `profile/${randomUUID()}.${extForMime(file.mimetype)}`,
+          file.buffer,
+          file.mimetype,
+        )
+      : undefined;
 
     return this.profiles.update(user.id, {
       firstName: dto.firstName,
       lastName: dto.lastName,
       profileImageUrl,
     });
+  }
+
+  // Clears the profile image and deletes the stored object (no-op if none set).
+  @Delete('image')
+  @ApiOkResponse({ type: UserDto })
+  removeImage(@CurrentUser() user: AuthUser) {
+    return this.profiles.removeImage(user.id);
   }
 }

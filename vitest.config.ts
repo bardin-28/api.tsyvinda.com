@@ -24,6 +24,8 @@ export default defineConfig({
       RESEND_API_KEY: 'test',
       EMAIL_FROM: 'Blog <noreply@example.com>',
       BCRYPT_COST: '4',
+      S3_BUCKET: 'test-bucket',
+      S3_PUBLIC_URL: 'http://localhost:4566/test-bucket',
     },
     coverage: {
       provider: 'v8',

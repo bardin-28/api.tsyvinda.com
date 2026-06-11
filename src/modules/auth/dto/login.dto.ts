@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsString, Length, MaxLength } from 'class-validator';
+import { ApiTurnstileToken } from '../../../shared/turnstile/turnstile-api.decorator';
 import { normalizeEmail } from './transforms';
 
 export class LoginDto {
@@ -14,4 +15,7 @@ export class LoginDto {
   @IsString()
   @Length(1, 72)
   password: string;
+
+  @ApiTurnstileToken()
+  'cf-turnstile-response': string;
 }

@@ -6,6 +6,8 @@ const baseEnv = {
   JWT_ACCESS_SECRET: 'x'.repeat(32),
   RESEND_API_KEY: 'test',
   EMAIL_FROM: 'Blog <noreply@example.com>',
+  S3_BUCKET: 'test-bucket',
+  S3_PUBLIC_URL: 'http://localhost:4566/test-bucket',
 } as NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {

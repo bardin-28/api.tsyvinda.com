@@ -6,6 +6,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import type { Redis } from 'ioredis';
 import { dataSourceOptions } from './db/database';
 import { RedisModule, REDIS } from './redis/redis.module';
+import { S3Module } from './shared/s3/s3.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -15,6 +16,7 @@ import { PostsModule } from './modules/posts/posts.module';
   imports: [
     TypeOrmModule.forRoot(dataSourceOptions),
     RedisModule,
+    S3Module,
     // Global rate limit: 100 requests / 60s per IP, backed by Redis (replaces the
     // old express-rate-limit + rate-limit-redis). Per-route overrides via @Throttle.
     ThrottlerModule.forRootAsync({

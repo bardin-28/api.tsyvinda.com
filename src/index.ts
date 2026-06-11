@@ -17,23 +17,10 @@ import { redis } from './redis/redis';
 import { HttpError } from './shared/http-error';
 import { AllExceptionsFilter } from './shared/all-exceptions.filter';
 import { validationExceptionFactory } from './shared/validation-exception.factory';
-import {
-  UPLOAD_DIR as PROFILE_UPLOAD_DIR,
-  PROFILE_IMAGE_URL_PREFIX,
-} from './modules/users/shared/upload';
-import {
-  UPLOAD_DIR as POST_UPLOAD_DIR,
-  POST_IMAGE_URL_PREFIX,
-} from './modules/posts/shared/upload';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 const allowedOrigins = new Set<string>([...config.frontendHost, `https://${config.backendHost}`]);
-
-function staticHeaders(res: ServerResponse): void {
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-}
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
@@ -80,17 +67,6 @@ async function bootstrap(): Promise<void> {
 
   app.use(cookieParser());
   app.useBodyParser('json', { limit: '1mb' });
-
-  app.useStaticAssets(PROFILE_UPLOAD_DIR, {
-    prefix: PROFILE_IMAGE_URL_PREFIX,
-    fallthrough: false,
-    setHeaders: staticHeaders,
-  });
-  app.useStaticAssets(POST_UPLOAD_DIR, {
-    prefix: POST_IMAGE_URL_PREFIX,
-    fallthrough: false,
-    setHeaders: staticHeaders,
-  });
 
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(

@@ -31,6 +31,18 @@ const envSchema = z
     // this exact value as `cf-turnstile-response` skips Cloudflare verification.
     // Must be a long, unguessable secret; rotate to revoke.
     TURNSTILE_BYPASS_TOKEN: z.string().min(16).optional(),
+    // S3 (local = MiniStack via S3_ENDPOINT; prod = real AWS, endpoint omitted →
+    // SDK default chain / EC2 IAM role). Access keys optional (unset in prod).
+    S3_BUCKET: z.string().min(1, 'S3_BUCKET is required'),
+    S3_REGION: z.string().min(1).default('eu-central-1'),
+    S3_ENDPOINT: z.string().url().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_PUBLIC_URL: z.string().url('S3_PUBLIC_URL must be a URL'),
+    S3_FORCE_PATH_STYLE: z
+      .string()
+      .default('false')
+      .transform((v) => v === 'true'),
   })
   .superRefine((e, ctx) => {
     // Cloudflare Turnstile is mandatory in production: a missing secret there means
@@ -81,6 +93,15 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     turnstile: {
       secretKey: e.TURNSTILE_SECRET_KEY,
       bypassToken: e.TURNSTILE_BYPASS_TOKEN,
+    },
+    s3: {
+      bucket: e.S3_BUCKET,
+      region: e.S3_REGION,
+      endpoint: e.S3_ENDPOINT,
+      accessKeyId: e.S3_ACCESS_KEY_ID,
+      secretAccessKey: e.S3_SECRET_ACCESS_KEY,
+      publicUrl: e.S3_PUBLIC_URL,
+      forcePathStyle: e.S3_FORCE_PATH_STYLE,
     },
   };
 }

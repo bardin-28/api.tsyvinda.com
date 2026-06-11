@@ -1,12 +1,10 @@
-import { unlink } from 'fs/promises';
-import path from 'path';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { type DataSource, type Repository } from 'typeorm';
 import { HttpError } from '../../../shared/http-error';
+import { S3Service } from '../../../shared/s3/s3.service';
 import { User } from '../../users/entities/user.entity';
 import { Post } from '../entities/post.entity';
-import { UPLOAD_DIR } from '../shared/upload';
 
 export interface PublicAuthor {
   id: string;
@@ -114,7 +112,10 @@ export function toPublicPost(post: Post, author: User): PublicPost {
 
 @Injectable()
 export class PostService {
-  constructor(@InjectDataSource() private readonly ds: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly ds: DataSource,
+    private readonly s3: S3Service,
+  ) {}
 
   private get posts(): Repository<Post> {
     return this.ds.getRepository(Post);
@@ -216,7 +217,7 @@ export class PostService {
     const saved = await this.posts.save(post);
 
     if (patch.imageUrl !== undefined && prevImage && prevImage !== patch.imageUrl) {
-      void safeUnlinkByUrl(prevImage);
+      void this.s3.deleteByUrl(prevImage);
     }
 
     const author = await this.users.findOne({ where: { id: saved.authorId } });
@@ -237,17 +238,7 @@ export class PostService {
     const prevImage = post.imageUrl;
     await this.posts.remove(post);
     if (prevImage) {
-      void safeUnlinkByUrl(prevImage);
+      void this.s3.deleteByUrl(prevImage);
     }
-  }
-}
-
-async function safeUnlinkByUrl(url: string): Promise<void> {
-  const filename = path.basename(url);
-  if (!filename || filename.includes('/') || filename.includes('\\')) return;
-  try {
-    await unlink(path.join(UPLOAD_DIR, filename));
-  } catch {
-    // best-effort
   }
 }
