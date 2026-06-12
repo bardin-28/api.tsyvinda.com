@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Patch,
   UploadedFile,
@@ -75,5 +76,11 @@ export class UsersController {
       lastName: dto.lastName,
       profileImageUrl,
     });
+  }
+
+  @Delete('image')
+  @ApiOkResponse({ type: UserDto })
+  deleteImage(@CurrentUser() user: AuthUser) {
+    return this.profiles.update(user.id, { profileImageUrl: null });
   }
 }
