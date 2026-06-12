@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, Length, Matches } from 'class-validator';
 import { IsMatch } from '../../../shared/validators/is-match.validator';
-import { ApiTurnstileToken } from '../../../shared/turnstile/turnstile-api.decorator';
 
 export class ResetPasswordDto {
   @ApiProperty({ minLength: 32, maxLength: 128 })
@@ -20,7 +19,4 @@ export class ResetPasswordDto {
   @IsString()
   @IsMatch('password', { message: 'passwords do not match' })
   confirmPassword: string;
-
-  @ApiTurnstileToken()
-  'cf-turnstile-response': string;
 }

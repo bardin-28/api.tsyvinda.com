@@ -2,7 +2,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsString, Length, Matches, MaxLength } from 'class-validator';
 import { IsMatch } from '../../../shared/validators/is-match.validator';
-import { ApiTurnstileToken } from '../../../shared/turnstile/turnstile-api.decorator';
 import { normalizeEmail, trimString } from './transforms';
 
 export class RegisterDto {
@@ -35,7 +34,4 @@ export class RegisterDto {
   @IsString()
   @IsMatch('password', { message: 'passwords do not match' })
   confirmPassword: string;
-
-  @ApiTurnstileToken()
-  'cf-turnstile-response': string;
 }
