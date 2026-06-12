@@ -63,14 +63,12 @@ const envSchema = z
         message: 'TURNSTILE_SECRET_KEY is required in production',
       });
     }
-    // Real SMTP delivery requires host + auth in production (SES). In dev the
-    // host points at Mailpit (no auth); in test it is unset and email is mocked.
-    if (e.NODE_ENV === 'production') {
-      for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'] as const) {
-        if (!e[key]) {
-          ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
-        }
-      }
+    // Production must have an SMTP host configured (fail fast instead of silently
+    // mocking email). Auth (SMTP_USER/PASS) is optional here — SES requires it and
+    // rejects at send time if absent, while the local Mailpit catcher (which also
+    // runs NODE_ENV=production) needs no auth.
+    if (e.NODE_ENV === 'production' && !e.SMTP_HOST) {
+      ctx.addIssue({ code: 'custom', path: ['SMTP_HOST'], message: 'SMTP_HOST is required in production' });
     }
   });
 
