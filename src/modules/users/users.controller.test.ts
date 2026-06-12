@@ -119,11 +119,3 @@ describe('DELETE /profile/image', () => {
     expect(res.body.profileImageUrl).toBeNull();
   });
 });
-
-describe('DELETE /profile/image', () => {
-  it('clears the profile image', async () => {
-    const res = await request(app.getHttpServer()).delete('/profile/image');
-    expect(res.status).toBe(200);
-    expect(profilesMock.update).toHaveBeenCalledWith('u1', { profileImageUrl: null });
-  });
-});
