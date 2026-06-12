@@ -156,6 +156,29 @@ describe('PATCH /posts/:id', () => {
       expect.objectContaining({ title: 'New' }),
     );
   });
+
+  it('updates only the image, ignoring blank multipart text fields', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/posts/p1')
+      .field('title', '')
+      .field('slug', '')
+      .field('description', '')
+      .field('htmlContent', '')
+      .attach('image', Buffer.from('img-bytes'), { filename: 'x.png', contentType: 'image/png' });
+    expect(res.status).toBe(200);
+    expect(s3Mock.put).toHaveBeenCalled();
+    expect(postsMock.update).toHaveBeenCalledWith(
+      'p1',
+      'u1',
+      expect.objectContaining({
+        title: undefined,
+        slug: undefined,
+        description: undefined,
+        htmlContent: undefined,
+        imageUrl: 'https://s3.example/posts/x.jpg',
+      }),
+    );
+  });
 });
 
 describe('DELETE /posts/:id', () => {
