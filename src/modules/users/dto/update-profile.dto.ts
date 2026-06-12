@@ -22,4 +22,8 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsIn(['true'])
   removeImage?: string;
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Profile image file' })
+  @IsOptional()
+  image?: unknown;
 }

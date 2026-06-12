@@ -31,4 +31,10 @@ export class CreatePostDto {
   @IsString()
   @Length(1, MAX_HTML)
   htmlContent: string;
+
+  // Swagger-only: renders the file picker for the `image` multipart field.
+  // Multer handles the actual file; it never lands in the validated body.
+  @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  @IsOptional()
+  image?: unknown;
 }
