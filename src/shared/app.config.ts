@@ -22,7 +22,15 @@ const envSchema = z
     JWT_ACCESS_TTL: z.string().min(1).default('15m'),
     REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
     BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
-    RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
+    // SMTP (prod = SES; local = Mailpit catcher; tests = unset → mocked).
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().positive().default(587),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_SECURE: z
+      .string()
+      .default('false')
+      .transform((v) => v === 'true'),
     EMAIL_FROM: z.string().min(1, 'EMAIL_FROM is required'),
     COOKIE_DOMAIN: z.string().optional(),
     TURNSTILE_SECRET_KEY: z.string().optional(),
@@ -55,6 +63,15 @@ const envSchema = z
         message: 'TURNSTILE_SECRET_KEY is required in production',
       });
     }
+    // Real SMTP delivery requires host + auth in production (SES). In dev the
+    // host points at Mailpit (no auth); in test it is unset and email is mocked.
+    if (e.NODE_ENV === 'production') {
+      for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'] as const) {
+        if (!e[key]) {
+          ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
+        }
+      }
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;
@@ -86,7 +103,11 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       bcryptCost: e.BCRYPT_COST,
     },
     email: {
-      resendApiKey: e.RESEND_API_KEY,
+      host: e.SMTP_HOST,
+      port: e.SMTP_PORT,
+      user: e.SMTP_USER,
+      pass: e.SMTP_PASS,
+      secure: e.SMTP_SECURE,
       from: e.EMAIL_FROM,
     },
     cookieDomain: e.COOKIE_DOMAIN,
