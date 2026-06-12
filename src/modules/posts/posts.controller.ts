@@ -20,11 +20,11 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { config } from '../../shared/app.config';
+import { randomUUID } from 'crypto';
 import { PostDto, PostListDto } from './dto/post.response';
 import { HttpError } from '../../shared/http-error';
-import { imageUploadOptions } from '../../shared/upload-options';
-import { CleanupUploadInterceptor } from '../../shared/cleanup-upload.interceptor';
+import { extForMime, imageUploadMemoryOptions } from '../../shared/upload-options';
+import { S3Service } from '../../shared/s3/s3.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { ApprovedGuard } from '../auth/guards/approved.guard';
 import { CurrentUser, type AuthUser } from '../auth/decorators/current-user.decorator';
@@ -32,12 +32,14 @@ import { PostService } from './services/post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { ListPostsQueryDto } from './dto/list-posts.query';
-import { POST_IMAGE_URL_PREFIX, UPLOAD_DIR } from './shared/upload';
 
 @ApiTags('Posts')
 @Controller('posts')
 export class PostsController {
-  constructor(private readonly posts: PostService) {}
+  constructor(
+    private readonly posts: PostService,
+    private readonly s3: S3Service,
+  ) {}
 
   @Get()
   @ApiOkResponse({ type: PostListDto })
@@ -57,17 +59,18 @@ export class PostsController {
   @ApiCookieAuth('cookieAuth')
   @ApiCreatedResponse({ type: PostDto })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('image', imageUploadOptions(UPLOAD_DIR)),
-    CleanupUploadInterceptor,
-  )
-  create(
+  @UseInterceptors(FileInterceptor('image', imageUploadMemoryOptions()))
+  async create(
     @CurrentUser() user: AuthUser,
     @Body() dto: CreatePostDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     const imageUrl = file
-      ? `https://${config.backendHost}${POST_IMAGE_URL_PREFIX}/${file.filename}`
+      ? await this.s3.put(
+          `posts/${randomUUID()}.${extForMime(file.mimetype)}`,
+          file.buffer,
+          file.mimetype,
+        )
       : null;
 
     return this.posts.create(user.id, {
@@ -84,11 +87,8 @@ export class PostsController {
   @ApiCookieAuth('cookieAuth')
   @ApiOkResponse({ type: PostDto })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('image', imageUploadOptions(UPLOAD_DIR)),
-    CleanupUploadInterceptor,
-  )
-  update(
+  @UseInterceptors(FileInterceptor('image', imageUploadMemoryOptions()))
+  async update(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() dto: UpdatePostDto,
@@ -105,7 +105,11 @@ export class PostsController {
     }
 
     const imageUrl: string | undefined = file
-      ? `https://${config.backendHost}${POST_IMAGE_URL_PREFIX}/${file.filename}`
+      ? await this.s3.put(
+          `posts/${randomUUID()}.${extForMime(file.mimetype)}`,
+          file.buffer,
+          file.mimetype,
+        )
       : undefined;
 
     return this.posts.update(id, user.id, {

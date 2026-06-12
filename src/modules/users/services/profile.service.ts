@@ -1,12 +1,10 @@
-import { unlink } from 'fs/promises';
-import path from 'path';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { type DataSource, type Repository } from 'typeorm';
 import { HttpError } from '../../../shared/http-error';
+import { S3Service } from '../../../shared/s3/s3.service';
 import { toPublicUser, type PublicUser } from '../../auth/services/auth.service';
 import { User } from '../entities/user.entity';
-import { UPLOAD_DIR } from '../shared/upload';
 
 export interface UpdateProfileInput {
   firstName?: string;
@@ -16,7 +14,10 @@ export interface UpdateProfileInput {
 
 @Injectable()
 export class ProfileService {
-  constructor(@InjectDataSource() private readonly ds: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly ds: DataSource,
+    private readonly s3: S3Service,
+  ) {}
 
   private get users(): Repository<User> {
     return this.ds.getRepository(User);
@@ -45,19 +46,25 @@ export class ProfileService {
     await this.users.save(user);
 
     if (patch.profileImageUrl !== undefined && prevImage && prevImage !== patch.profileImageUrl) {
-      void deletePriorImage(prevImage);
+      void this.s3.deleteByUrl(prevImage);
     }
 
     return toPublicUser(user);
   }
-}
 
-async function deletePriorImage(prevUrl: string): Promise<void> {
-  const filename = path.basename(prevUrl);
-  if (!filename || filename.includes('/') || filename.includes('\\')) return;
-  try {
-    await unlink(path.join(UPLOAD_DIR, filename));
-  } catch {
-    // best-effort cleanup
+  async removeImage(userId: string): Promise<PublicUser> {
+    const user = await this.users.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new HttpError(404, 'USER_NOT_FOUND', 'User not found');
+    }
+
+    const prevImage = user.profileImageUrl;
+    if (prevImage) {
+      user.profileImageUrl = null;
+      await this.users.save(user);
+      void this.s3.deleteByUrl(prevImage);
+    }
+
+    return toPublicUser(user);
   }
 }

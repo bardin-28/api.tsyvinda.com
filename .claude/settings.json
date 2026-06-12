@@ -15,12 +15,45 @@
       "Bash(docker volume ls *)",
       "Bash(docker compose *)",
       "Bash(docker volume rm *)",
-      "Bash(rtk docker *)"
+      "Bash(rtk docker *)",
+      "Bash(terraform fmt*)",
+      "Bash(terraform validate*)",
+      "Bash(terraform init*)",
+      "Bash(terraform plan*)",
+      "Bash(terraform show*)",
+      "Bash(terraform output*)",
+      "Bash(terraform providers*)",
+      "Bash(terraform version*)",
+      "Bash(terraform state list*)",
+      "Bash(terraform state show*)",
+      "Bash(aws sts get-caller-identity*)",
+      "Bash(aws ec2 describe-*)",
+      "Bash(aws rds describe-*)",
+      "Bash(aws s3 ls*)",
+      "Bash(aws s3api list-*)",
+      "Bash(aws s3api get-*)",
+      "Bash(aws s3api head-*)",
+      "Bash(aws iam get-*)",
+      "Bash(aws iam list-*)",
+      "Bash(aws ecr describe-*)",
+      "Bash(aws ecr list-*)",
+      "Bash(aws elbv2 describe-*)",
+      "Bash(aws logs describe-*)",
+      "Bash(aws logs get-*)",
+      "Bash(aws logs filter-log-events*)",
+      "Bash(aws cloudwatch describe-*)",
+      "Bash(aws cloudwatch get-*)"
     ],
     "deny": [
       "Bash(rm -rf *)",
       "Bash(sudo *)",
       "Bash(curl *)",
+      "Bash(terraform apply*)",
+      "Bash(terraform destroy*)",
+      "Bash(terraform import*)",
+      "Bash(terraform taint*)",
+      "Bash(terraform state rm*)",
+      "Bash(terraform state mv*)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(**/*.pem)",
@@ -48,5 +81,5 @@
   "sandbox": {
     "enabled": true
   },
-  "additionalDirectories": ["../test-fe"]
+  "additionalDirectories": ["../fe", "../infra"]
 }

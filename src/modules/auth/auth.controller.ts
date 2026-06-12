@@ -34,11 +34,7 @@ export class AuthController {
   @HttpCode(201)
   @Throttle({ default: { limit: 10, ttl: MINUTE } })
   @UseInterceptors(TurnstileInterceptor)
-  @ApiOperation({
-    summary: 'Register a new user',
-    description:
-      'Send the Cloudflare Turnstile token as `cf-turnstile-response` when Turnstile is configured.',
-  })
+  @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ status: 201, description: 'Verification email sent' })
   @ApiResponse({ status: 409, description: 'Email already registered', type: ErrorDto })
   async register(@Body() dto: RegisterDto): Promise<{ message: string }> {
@@ -87,11 +83,7 @@ export class AuthController {
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: MINUTE } })
   @UseInterceptors(TurnstileInterceptor)
-  @ApiOperation({
-    summary: 'Login with email + password',
-    description:
-      'Send the Cloudflare Turnstile token as `cf-turnstile-response` when Turnstile is configured.',
-  })
+  @ApiOperation({ summary: 'Login with email + password' })
   @ApiOkResponse({
     description: 'Authenticated; access + refresh cookies issued',
     type: AuthLoginResponseDto,

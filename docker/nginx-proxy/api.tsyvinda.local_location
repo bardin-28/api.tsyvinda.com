@@ -1,0 +1,8 @@
+# Local-only: serve MiniStack (S3) objects under https://api.tsyvinda.local/s3/...
+# jwilder/nginx-proxy includes this file inside the api.tsyvinda.local server block.
+# proxy_pass injects the bucket, so the public URL hides it: /s3/<key> maps to
+# ministack:4566/tsyvinda-local/<key> (path-style). Bucket is public-read → anon GET.
+location /s3/ {
+    proxy_pass http://ministack:4566/tsyvinda-local/;
+    proxy_set_header Host $host;
+}
