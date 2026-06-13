@@ -62,8 +62,14 @@ export class EmailService {
     const html = await render(element);
     const text = await render(element, { plainText: true });
 
+    // Route through the SES configuration set (prod) so delivery/bounce/complaint
+    // events are published to CloudWatch. Omitted locally (Mailpit ignores it).
+    const headers = config.email.configurationSet
+      ? { 'X-SES-CONFIGURATION-SET': config.email.configurationSet }
+      : undefined;
+
     try {
-      await this.transport.sendMail({ from: config.email.from, to, subject, html, text });
+      await this.transport.sendMail({ from: config.email.from, to, subject, html, text, headers });
     } catch (error) {
       throw new HttpError(502, 'EMAIL_SEND_FAILED', `Failed to send ${label} email`, error);
     }

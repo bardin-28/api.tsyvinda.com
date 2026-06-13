@@ -31,6 +31,10 @@ const envSchema = z
       .string()
       .default('false')
       .transform((v) => v === 'true'),
+    // SES configuration set (prod). Sent as the X-SES-CONFIGURATION-SET header so
+    // SES publishes send/delivery/bounce/complaint events to CloudWatch. Unset
+    // locally (Mailpit) → header omitted.
+    SMTP_CONFIGURATION_SET: z.string().optional(),
     EMAIL_FROM: z.string().min(1, 'EMAIL_FROM is required'),
     COOKIE_DOMAIN: z.string().optional(),
     TURNSTILE_SECRET_KEY: z.string().optional(),
@@ -107,6 +111,7 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       pass: e.SMTP_PASS,
       secure: e.SMTP_SECURE,
       from: e.EMAIL_FROM,
+      configurationSet: e.SMTP_CONFIGURATION_SET,
     },
     cookieDomain: e.COOKIE_DOMAIN,
     turnstile: {
