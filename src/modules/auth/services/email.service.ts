@@ -1,7 +1,7 @@
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { Injectable } from '@nestjs/common';
 import { render } from '@react-email/render';
-import { Resend } from 'resend';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from '../../../shared/app.config';
 import { logger } from '../../../shared/logger';
 import { HttpError } from '../../../shared/http-error';
@@ -26,86 +26,71 @@ interface WelcomeEmailInput {
   username: string;
 }
 
-// Provided in AuthModule via useFactory (the primitive apiKey constructor param
-// cannot be resolved by Nest DI), so it is constructed without arguments at runtime.
+// SMTP delivery via nodemailer. Prod targets AWS SES (STARTTLS on 587, auth from
+// the SealedSecret); local targets the in-cluster Mailpit catcher (no auth/TLS).
+// When SMTP_HOST is unset (tests) the transport is null and sends are mocked.
 @Injectable()
 export class EmailService {
-  private readonly client: Resend | null;
+  private readonly transport: Transporter | null;
 
-  constructor(apiKey: string = config.email.resendApiKey) {
-    this.client = apiKey === 'test' ? null : new Resend(apiKey);
+  constructor() {
+    const { host, port, user, pass, secure } = config.email;
+    this.transport = host
+      ? nodemailer.createTransport({
+          host,
+          port,
+          secure, // true for 465; 587 uses STARTTLS (secure=false, auto-upgraded)
+          auth: user && pass ? { user, pass } : undefined,
+        })
+      : null;
   }
 
-  async sendVerificationEmail({ to, firstName, url }: VerificationEmailInput): Promise<void> {
-    const element = createElement(ConfirmEmail, { firstName, url });
-    const html = await render(element);
-    const text = await render(element, { plainText: true });
-    const subject = 'Confirm your email';
-
-    if (!this.client) {
-      logger.debug({ to, url }, 'email:verify (mocked)');
+  // Renders the React email to HTML + plain text and sends it. No-op (logged)
+  // when no transport is configured, so tests don't hit a real SMTP server.
+  private async deliver(
+    label: string,
+    to: string,
+    subject: string,
+    element: ReactElement,
+    logContext: Record<string, unknown>,
+  ): Promise<void> {
+    if (!this.transport) {
+      logger.debug({ to, ...logContext }, `email:${label} (mocked)`);
       return;
     }
 
-    const { error } = await this.client.emails.send({
-      from: config.email.from,
-      to,
-      subject,
-      html,
-      text,
-    });
+    const html = await render(element);
+    const text = await render(element, { plainText: true });
 
-    if (error) {
-      throw new HttpError(502, 'EMAIL_SEND_FAILED', 'Failed to send verification email', error);
+    // Route through the SES configuration set (prod) so delivery/bounce/complaint
+    // events are published to CloudWatch. Omitted locally (Mailpit ignores it).
+    const headers = config.email.configurationSet
+      ? { 'X-SES-CONFIGURATION-SET': config.email.configurationSet }
+      : undefined;
+
+    try {
+      await this.transport.sendMail({ from: config.email.from, to, subject, html, text, headers });
+    } catch (error) {
+      throw new HttpError(502, 'EMAIL_SEND_FAILED', `Failed to send ${label} email`, error);
     }
+  }
+
+  async sendVerificationEmail({ to, firstName, url }: VerificationEmailInput): Promise<void> {
+    await this.deliver('verify', to, 'Confirm your email', createElement(ConfirmEmail, { firstName, url }), { url });
   }
 
   async sendWelcomeEmail({ to, username }: WelcomeEmailInput): Promise<void> {
     const appUrl = config.frontendHost[0];
-    const element = createElement(WelcomeEmail, { username, appUrl });
-    const html = await render(element);
-    const text = await render(element, { plainText: true });
-    const subject = 'Welcome!';
-
-    if (!this.client) {
-      logger.debug({ to }, 'email:welcome (mocked)');
-      return;
-    }
-
-    const { error } = await this.client.emails.send({
-      from: config.email.from,
-      to,
-      subject,
-      html,
-      text,
-    });
-
-    if (error) {
-      throw new HttpError(502, 'EMAIL_SEND_FAILED', 'Failed to send welcome email', error);
-    }
+    await this.deliver('welcome', to, 'Welcome!', createElement(WelcomeEmail, { username, appUrl }), {});
   }
 
   async sendPasswordResetEmail({ to, firstName, url }: PasswordResetEmailInput): Promise<void> {
-    const element = createElement(ResetPasswordEmail, { firstName, url });
-    const html = await render(element);
-    const text = await render(element, { plainText: true });
-    const subject = 'Reset your password';
-
-    if (!this.client) {
-      logger.debug({ to, url }, 'email:reset-password (mocked)');
-      return;
-    }
-
-    const { error } = await this.client.emails.send({
-      from: config.email.from,
+    await this.deliver(
+      'reset-password',
       to,
-      subject,
-      html,
-      text,
-    });
-
-    if (error) {
-      throw new HttpError(502, 'EMAIL_SEND_FAILED', 'Failed to send password reset email', error);
-    }
+      'Reset your password',
+      createElement(ResetPasswordEmail, { firstName, url }),
+      { url },
+    );
   }
 }

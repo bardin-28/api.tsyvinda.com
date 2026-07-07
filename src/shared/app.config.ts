@@ -22,7 +22,19 @@ const envSchema = z
     JWT_ACCESS_TTL: z.string().min(1).default('15m'),
     REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
     BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
-    RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
+    // SMTP (prod = SES; local = Mailpit catcher; tests = unset → mocked).
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().positive().default(587),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_SECURE: z
+      .string()
+      .default('false')
+      .transform((v) => v === 'true'),
+    // SES configuration set (prod). Sent as the X-SES-CONFIGURATION-SET header so
+    // SES publishes send/delivery/bounce/complaint events to CloudWatch. Unset
+    // locally (Mailpit) → header omitted.
+    SMTP_CONFIGURATION_SET: z.string().optional(),
     EMAIL_FROM: z.string().min(1, 'EMAIL_FROM is required'),
     COOKIE_DOMAIN: z.string().optional(),
     TURNSTILE_SECRET_KEY: z.string().optional(),
@@ -55,6 +67,13 @@ const envSchema = z
         message: 'TURNSTILE_SECRET_KEY is required in production',
       });
     }
+    // Production must have an SMTP host configured (fail fast instead of silently
+    // mocking email). Auth (SMTP_USER/PASS) is optional here — SES requires it and
+    // rejects at send time if absent, while the local Mailpit catcher (which also
+    // runs NODE_ENV=production) needs no auth.
+    if (e.NODE_ENV === 'production' && !e.SMTP_HOST) {
+      ctx.addIssue({ code: 'custom', path: ['SMTP_HOST'], message: 'SMTP_HOST is required in production' });
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;
@@ -86,8 +105,13 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       bcryptCost: e.BCRYPT_COST,
     },
     email: {
-      resendApiKey: e.RESEND_API_KEY,
+      host: e.SMTP_HOST,
+      port: e.SMTP_PORT,
+      user: e.SMTP_USER,
+      pass: e.SMTP_PASS,
+      secure: e.SMTP_SECURE,
       from: e.EMAIL_FROM,
+      configurationSet: e.SMTP_CONFIGURATION_SET,
     },
     cookieDomain: e.COOKIE_DOMAIN,
     turnstile: {

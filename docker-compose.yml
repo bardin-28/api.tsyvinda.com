@@ -61,7 +61,10 @@ services:
       - JWT_ACCESS_TTL=${JWT_ACCESS_TTL:-15m}
       - REFRESH_TTL_DAYS=${REFRESH_TTL_DAYS:-30}
       - BCRYPT_COST=${BCRYPT_COST:-12}
-      - RESEND_API_KEY=${RESEND_API_KEY}
+      # Email → in-network Mailpit catcher (no auth/TLS). Prod uses SES via SMTP_*.
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - SMTP_SECURE=false
       - EMAIL_FROM=${EMAIL_FROM}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
@@ -93,6 +96,8 @@ services:
       redis:
         condition: service_healthy
       ministack:
+        condition: service_started
+      mailpit:
         condition: service_started
 
   postgres:
@@ -130,6 +135,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Local email catcher (dev only). Real AWS SES in prod. The app sends to
+  # mailpit:1025 over the compose network; view caught mail at http://localhost:8025.
+  # 1025/8025 are also host-mapped so a backend run natively (npm, SMTP_HOST=localhost)
+  # hits the same catcher.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: ${RESTART_POLICY:-no}
+    logging: *default-logging
+    ports:
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025'
+    networks:
+      - app-backend
 
   # Local S3 (dev only). Real AWS S3 in prod. MiniStack = MIT LocalStack-compatible,
   # tiny footprint (~30MB). Bucket created by the s3-init one-shot below.
