@@ -96,5 +96,5 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "deploy(backend): ${{ github.sha }}"
+          git commit -am "deploy(backend$([ "$BUMP_ADMIN" = "true" ] && echo ',admin')): ${{ github.sha }}"
           git push
