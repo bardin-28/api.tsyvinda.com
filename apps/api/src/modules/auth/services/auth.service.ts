@@ -1,0 +1,370 @@
+import { Injectable } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { IsNull, type DataSource, type Repository } from 'typeorm';
+import { Role } from '@tsyvinda/shared-types';
+import { config } from '../../../shared/app.config';
+import { HttpError } from '../../../shared/http-error';
+import { logger } from '../../../shared/logger';
+import { User } from '../../users/entities/user.entity';
+import { EmailService } from './email.service';
+import { EmailVerification } from '../entities/email-verification.entity';
+import { PasswordReset } from '../entities/password-reset.entity';
+import { hashPassword, verifyPassword } from './crypto.service';
+import { RefreshToken } from '../entities/refresh-token.entity';
+import {
+  type AuthSurface,
+  generateOpaqueToken,
+  hashOpaqueToken,
+  signAccessToken,
+} from './token.service';
+import { UserIdentity } from '../entities/user-identity.entity';
+
+const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const REUSE_IDEMPOTENCY_MS = 60 * 60 * 1000;
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
+
+export interface PublicUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: Role;
+  profileImageUrl: string | null;
+  emailVerified: boolean;
+  approvedByAdmin: boolean;
+  createdAt: Date;
+}
+
+export interface RegisterInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+  userAgent: string | null;
+  ip: string | null;
+  /** Defaults to 'website'. 'admin' only signs in users with the ADMIN role. */
+  surface?: AuthSurface;
+}
+
+export interface RefreshInput {
+  rawRefresh: string;
+  userAgent: string | null;
+  ip: string | null;
+  surface?: AuthSurface;
+}
+
+export interface AuthSessionResult {
+  accessToken: string;
+  refreshToken: string;
+  user: PublicUser;
+}
+
+@Injectable()
+export class AuthService {
+  constructor(
+    @InjectDataSource() private readonly ds: DataSource,
+    private readonly email: EmailService,
+  ) {}
+
+  private get users(): Repository<User> {
+    return this.ds.getRepository(User);
+  }
+
+  private get verifications(): Repository<EmailVerification> {
+    return this.ds.getRepository(EmailVerification);
+  }
+
+  private get refreshTokens(): Repository<RefreshToken> {
+    return this.ds.getRepository(RefreshToken);
+  }
+
+  private get passwordResets(): Repository<PasswordReset> {
+    return this.ds.getRepository(PasswordReset);
+  }
+
+  async register(input: RegisterInput): Promise<void> {
+    const email = input.email;
+    const existing = await this.users.findOne({ where: { email } });
+
+    if (existing) {
+      throw new HttpError(409, 'EMAIL_TAKEN', 'Email already registered');
+    }
+
+    const frontend = config.frontendHost[0];
+
+    if (!frontend) {
+      throw new HttpError(500, 'EMAIL_NOT_CONFIGURED', 'FRONTEND_HOST is not configured');
+    }
+
+    const passwordHash = await hashPassword(input.password);
+    const { raw: rawToken, hash: tokenHash } = generateOpaqueToken();
+    const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
+
+    await this.ds.transaction(async (manager) => {
+      const user = manager.getRepository(User).create({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email,
+        passwordHash,
+        emailVerified: false,
+        profileImageUrl: null,
+      });
+      const savedUser = await manager.getRepository(User).save(user);
+
+      const identity = manager.getRepository(UserIdentity).create({
+        userId: savedUser.id,
+        provider: 'local',
+        providerUserId: savedUser.id,
+      });
+      await manager.getRepository(UserIdentity).save(identity);
+
+      const verification = manager.getRepository(EmailVerification).create({
+        userId: savedUser.id,
+        tokenHash,
+        expiresAt,
+        consumedAt: null,
+      });
+      await manager.getRepository(EmailVerification).save(verification);
+    });
+
+    await this.email.sendVerificationEmail({
+      to: email,
+      firstName: input.firstName,
+      url: `${frontend}/registration?token=${rawToken}`,
+    });
+  }
+
+  async confirmEmail(rawToken: string): Promise<void> {
+    const tokenHash = hashOpaqueToken(rawToken);
+    const verification = await this.verifications.findOne({ where: { tokenHash } });
+    if (!verification) {
+      throw new HttpError(400, 'INVALID_TOKEN', 'Invalid confirmation token');
+    }
+
+    const now = Date.now();
+    if (verification.consumedAt) {
+      const user = await this.users.findOne({ where: { id: verification.userId } });
+      if (user?.emailVerified && now - verification.consumedAt.getTime() < REUSE_IDEMPOTENCY_MS) {
+        return;
+      }
+      throw new HttpError(400, 'INVALID_TOKEN', 'Confirmation token already used');
+    }
+    if (verification.expiresAt.getTime() < now) {
+      throw new HttpError(400, 'INVALID_TOKEN', 'Confirmation token expired');
+    }
+
+    await this.ds.transaction(async (manager) => {
+      verification.consumedAt = new Date();
+      await manager.getRepository(EmailVerification).save(verification);
+      await manager
+        .getRepository(User)
+        .update({ id: verification.userId }, { emailVerified: true });
+    });
+
+    // Welcome email fires once, after the account is verified. Delivery failure
+    // must not fail confirmation (the account is already verified), so log and move on.
+    const verifiedUser = await this.users.findOne({ where: { id: verification.userId } });
+    if (verifiedUser) {
+      try {
+        await this.email.sendWelcomeEmail({
+          to: verifiedUser.email,
+          username: verifiedUser.firstName,
+        });
+      } catch (err) {
+        logger.error({ err, userId: verifiedUser.id }, 'failed to send welcome email');
+      }
+    }
+  }
+
+  // Always resolves without revealing whether the email exists (enumeration safe).
+  // The route returns a generic 200 regardless of outcome.
+  async requestPasswordReset(rawEmail: string): Promise<void> {
+    const email = rawEmail;
+    const user = await this.users.findOne({ where: { email } });
+
+    // No account, or an OAuth-only account with no password to reset: do nothing.
+    if (!user || !user.passwordHash) {
+      return;
+    }
+
+    const frontend = config.frontendHost[0];
+    if (!frontend) {
+      throw new HttpError(500, 'EMAIL_NOT_CONFIGURED', 'FRONTEND_HOST is not configured');
+    }
+
+    const { raw: rawToken, hash: tokenHash } = generateOpaqueToken();
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+    const now = new Date();
+
+    await this.ds.transaction(async (manager) => {
+      const repo = manager.getRepository(PasswordReset);
+      // Invalidate any outstanding reset tokens so only the newest link is valid.
+      const outstanding = await repo.find({ where: { userId: user.id, consumedAt: IsNull() } });
+      for (const row of outstanding) row.consumedAt = now;
+      if (outstanding.length > 0) await repo.save(outstanding);
+
+      const reset = repo.create({
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+        consumedAt: null,
+      });
+      await repo.save(reset);
+    });
+
+    await this.email.sendPasswordResetEmail({
+      to: user.email,
+      firstName: user.firstName,
+      url: `${frontend}/reset-password?token=${rawToken}`,
+    });
+  }
+
+  async resetPassword(rawToken: string, newPassword: string): Promise<void> {
+    const tokenHash = hashOpaqueToken(rawToken);
+    const reset = await this.passwordResets.findOne({ where: { tokenHash } });
+    if (!reset) {
+      throw new HttpError(400, 'INVALID_TOKEN', 'Invalid password reset token');
+    }
+    if (reset.consumedAt) {
+      throw new HttpError(400, 'INVALID_TOKEN', 'Password reset token already used');
+    }
+    if (reset.expiresAt.getTime() < Date.now()) {
+      throw new HttpError(400, 'INVALID_TOKEN', 'Password reset token expired');
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+
+    await this.ds.transaction(async (manager) => {
+      reset.consumedAt = new Date();
+      await manager.getRepository(PasswordReset).save(reset);
+      await manager.getRepository(User).update({ id: reset.userId }, { passwordHash });
+
+      // Changing the password invalidates every existing session.
+      const tokens = await manager
+        .getRepository(RefreshToken)
+        .find({ where: { userId: reset.userId } });
+      const now = new Date();
+      const active = tokens.filter((token) => !token.revokedAt);
+      for (const token of active) token.revokedAt = now;
+      if (active.length > 0) await manager.getRepository(RefreshToken).save(active);
+    });
+  }
+
+  async login(input: LoginInput): Promise<AuthSessionResult> {
+    const user = await this.users.findOne({ where: { email: input.email } });
+    if (!user || !user.passwordHash) {
+      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    }
+    const matches = await verifyPassword(input.password, user.passwordHash);
+    if (!matches) {
+      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    }
+    const surface = input.surface ?? 'website';
+    // Same answer as a wrong password, so the admin login doesn't reveal which accounts exist.
+    if (surface === 'admin' && user.role !== Role.ADMIN) {
+      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    }
+    if (!user.emailVerified) {
+      throw new HttpError(403, 'EMAIL_NOT_VERIFIED', 'Email is not verified');
+    }
+
+    return this.issueSession(user, surface, input.userAgent, input.ip);
+  }
+
+  async rotateRefresh(input: RefreshInput): Promise<AuthSessionResult> {
+    const tokenHash = hashOpaqueToken(input.rawRefresh);
+    const existing = await this.refreshTokens.findOne({ where: { tokenHash } });
+    const surface = input.surface ?? 'website';
+    if (!existing || (existing.surface ?? 'website') !== surface) {
+      throw new HttpError(401, 'INVALID_REFRESH', 'Invalid refresh token');
+    }
+
+    if (existing.revokedAt) {
+      const userTokens = await this.refreshTokens.find({ where: { userId: existing.userId } });
+      const now = new Date();
+      const toRevoke = userTokens.filter((token) => !token.revokedAt);
+      for (const token of toRevoke) token.revokedAt = now;
+      if (toRevoke.length > 0) await this.refreshTokens.save(toRevoke);
+      throw new HttpError(401, 'REFRESH_REUSE', 'Refresh token reuse detected');
+    }
+
+    if (existing.expiresAt.getTime() < Date.now()) {
+      throw new HttpError(401, 'INVALID_REFRESH', 'Refresh token expired');
+    }
+
+    const user = await this.users.findOne({ where: { id: existing.userId } });
+    // A demoted admin loses the panel on the next refresh.
+    if (!user || (surface === 'admin' && user.role !== Role.ADMIN)) {
+      throw new HttpError(401, 'INVALID_REFRESH', 'Invalid refresh token');
+    }
+
+    const session = await this.issueSession(user, surface, input.userAgent, input.ip);
+    const newHash = hashOpaqueToken(session.refreshToken);
+    const newRow = await this.refreshTokens.findOne({ where: { tokenHash: newHash } });
+
+    existing.revokedAt = new Date();
+    existing.replacedById = newRow?.id ?? null;
+    await this.refreshTokens.save(existing);
+
+    return session;
+  }
+
+  async logout(rawRefresh: string | undefined): Promise<void> {
+    if (!rawRefresh) return;
+    const tokenHash = hashOpaqueToken(rawRefresh);
+    const existing = await this.refreshTokens.findOne({ where: { tokenHash } });
+    if (!existing || existing.revokedAt) return;
+    existing.revokedAt = new Date();
+    await this.refreshTokens.save(existing);
+  }
+
+  async getPublicUser(userId: string): Promise<PublicUser> {
+    const user = await this.users.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'User no longer exists');
+    }
+    return toPublicUser(user);
+  }
+
+  private async issueSession(
+    user: User,
+    surface: AuthSurface,
+    userAgent: string | null,
+    ip: string | null,
+  ): Promise<AuthSessionResult> {
+    const accessToken = signAccessToken(user.id, surface);
+    const { raw: refreshToken, hash: refreshHash } = generateOpaqueToken();
+    const expiresAt = new Date(Date.now() + config.auth.refreshTtlDays * 24 * 60 * 60 * 1000);
+    const row = this.refreshTokens.create({
+      userId: user.id,
+      tokenHash: refreshHash,
+      surface,
+      expiresAt,
+      revokedAt: null,
+      replacedById: null,
+      userAgent: userAgent?.slice(0, 255) ?? null,
+      ip: ip?.slice(0, 45) ?? null,
+    });
+    await this.refreshTokens.save(row);
+    return { accessToken, refreshToken, user: toPublicUser(user) };
+  }
+}
+
+export function toPublicUser(user: User): PublicUser {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    role: user.role,
+    profileImageUrl: user.profileImageUrl,
+    emailVerified: user.emailVerified,
+    approvedByAdmin: user.approvedByAdmin,
+    createdAt: user.createdAt,
+  };
+}

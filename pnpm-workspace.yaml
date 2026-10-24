@@ -1,0 +1,15 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Packages whose install scripts may run (pnpm blocks lifecycle scripts by default).
+allowBuilds:
+  '@nestjs/core': true
+  '@scarf/scarf': false
+  '@swc/core': true
+  bcrypt: true
+  esbuild: true
+  unrs-resolver: true
+
+settings:
+  confirmModulesPurge: false

@@ -1,26 +1,15 @@
-import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import sharedConfig from '@tsyvinda/eslint-config';
 
 export default [
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**'] },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
+  { ignores: ['docs/**', '.claude/**'] },
+  ...sharedConfig,
   {
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: 'module',
-      globals: { ...globals.node },
-    },
-    rules: {
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/no-explicit-any': 'warn',
-      'no-empty': ['error', { allowEmptyCatch: true }],
-    },
+    files: ['apps/api/**/*.{ts,tsx}', 'packages/**/*.{js,ts}', '*.{js,mjs}'],
+    languageOptions: { globals: { ...globals.node } },
   },
-  prettier,
+  {
+    files: ['apps/admin/**/*.{ts,tsx}'],
+    languageOptions: { globals: { ...globals.browser } },
+  },
 ];
