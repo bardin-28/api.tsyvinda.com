@@ -22,7 +22,7 @@ const envSchema = z
     JWT_ACCESS_TTL: z.string().min(1).default('15m'),
     REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
     BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
-    // SMTP (prod = SES; local = Mailpit catcher; tests = unset → mocked).
+    // SMTP (prod = Resend relay, later SES; local = Mailpit catcher; tests = unset → mocked).
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().positive().default(587),
     SMTP_USER: z.string().optional(),

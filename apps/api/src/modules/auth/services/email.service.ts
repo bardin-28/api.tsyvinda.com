@@ -26,8 +26,9 @@ interface WelcomeEmailInput {
   username: string;
 }
 
-// SMTP delivery via nodemailer. Prod targets AWS SES (STARTTLS on 587, auth from
-// the SealedSecret); local targets the in-cluster Mailpit catcher (no auth/TLS).
+// SMTP delivery via nodemailer — provider-agnostic. Prod uses Resend's SMTP relay
+// (smtp.resend.com:465, auth from the SealedSecret) until SES has production access;
+// local targets the Mailpit catcher (no auth/TLS).
 // When SMTP_HOST is unset (tests) the transport is null and sends are mocked.
 @Injectable()
 export class EmailService {
