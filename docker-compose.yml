@@ -16,11 +16,7 @@ x-logging: &default-logging
 
 services:
   nginx-proxy:
-    build:
-      context: ./docker/nginx-proxy
-      args:
-        - BASIC_AUTH=false
-        - BASIC_AUTH_HOST=${BACKEND_HOST}
+    image: nginxproxy/nginx-proxy
     ports:
       - '80:80'
       - '443:443'

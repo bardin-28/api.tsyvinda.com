@@ -19,10 +19,7 @@ pnpm + Turborepo monorepo:
 - [Development (local, no Docker)](#development-local-no-docker)
 - [Scripts](#scripts)
 - [Admin panel](#admin-panel)
-- [Production — first-time deploy](#production--first-time-deploy)
-- [Production — updates](#production--updates)
-- [Database access](#database-access)
-- [Backups](#backups)
+- [Production](#production)
 - [Environment variables](#environment-variables)
 - [Auth](#auth)
 - [Project structure](#project-structure)
@@ -140,323 +137,26 @@ React-Admin app in `apps/admin`, served under `/admin` on its own host (`ADMIN_H
 
 ---
 
-## Production — first-time deploy
+## Production
 
-### 1. Provision droplet
+Prod runs on K3s on a single EC2 node in AWS `eu-central-1`, deployed by ArgoCD from the infra repo
+(`bardin-28/infra.tsyvinda.com`). On every push to `main`, CI builds the API (and admin) image, pushes it to
+ECR and bumps the image tag in the infra repo; ArgoCD rolls it out and runs migrations as a pre-sync Job.
 
-DigitalOcean Ubuntu 24.04, smallest tier ok for small APIs. SSH in as `root`.
+- **Postgres**: AWS RDS (`db.t4g.micro`), private — reachable only from inside the VPC.
+- **Redis**: in-cluster.
+- **Uploads**: S3 bucket behind CloudFront (`https://cdn.tsyvinda.com`).
+- **Config + secrets**: Helm values and the backend Secret in the infra repo — no env file in this repo.
 
-```bash
-apt update && apt upgrade -y
-apt install -y curl git ufw fail2ban unattended-upgrades
-```
+Infrastructure, deploy and runbooks live in the infra repo (`docs/`).
 
-### 2. Create non-root user
-
-```bash
-adduser deploy
-usermod -aG sudo deploy
-rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy
-```
-
-### 3. SSH hardening — edit `/etc/ssh/sshd_config`
-
-```
-PermitRootLogin no
-PasswordAuthentication no
-PubkeyAuthentication yes
-```
-
-```bash
-systemctl restart ssh
-```
-
-Test login as `deploy@<ip>` in a separate terminal **before** disconnecting root.
-
-### 4. Firewall
-
-```bash
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow OpenSSH
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw enable
-```
-
-### 5. Swap (if RAM ≤ 2GB)
-
-```bash
-fallocate -l 2G /swapfile
-chmod 600 /swapfile
-mkswap /swapfile && swapon /swapfile
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-```
-
-### 6. Auto security updates
-
-```bash
-dpkg-reconfigure --priority=low unattended-upgrades
-```
-
-### 7. Install Docker + Compose v2
-
-```bash
-curl -fsSL https://get.docker.com | sh
-usermod -aG docker deploy
-# logout and back in as deploy
-```
-
-If droplet has the old `docker-compose` (v1, Python) package, remove it:
-
-```bash
-sudo apt remove -y docker-compose
-```
-
-Verify v2 plugin:
-
-```bash
-docker compose version
-```
-
-### 8. DNS
-
-In GoDaddy (or your DNS provider) create an `A` record:
-
-| Field       | Value                          |
-| ----------- | ------------------------------ |
-| Type        | `A`                            |
-| Name (Host) | `api` (for `api.tsyvinda.com`) |
-| Value       | droplet IPv4                   |
-| TTL         | `600`                          |
-
-Wait for propagation:
-
-```bash
-dig +short api.tsyvinda.com
-# must return droplet IP before next step — acme-companion will fail otherwise
-```
-
-### 9. Clone repo
-
-If using SSH (recommended):
-
-```bash
-ssh-keygen -t ed25519 -C "deploy@droplet"
-cat ~/.ssh/id_ed25519.pub
-# add the output to GitHub → Settings → SSH and GPG keys
-ssh -T git@github.com
-git clone git@github.com:bardin-28/api.tsyvinda.com.git ~/app
-```
-
-Or HTTPS:
-
-```bash
-git clone https://github.com/bardin-28/api.tsyvinda.com.git ~/app
-```
-
-### 10. Prod `.env`
-
-Generate strong secrets locally and `scp` the file to the droplet, or create on the droplet directly. Sample content:
-
-```env
-COMPOSE_PROJECT_NAME=api-tsyvinda
-
-BACKEND_HOST=api.tsyvinda.com
-LETSENCRYPT_EMAIL=you@example.com
-
-NODE_ENV=production
-PORT=3000
-FRONTEND_HOST=https://tsyvinda.com
-
-BASIC_AUTH=false
-BASIC_AUTH_USERNAME=admin
-BASIC_AUTH_PASSWORD=<random>
-
-POSTGRES_USER=api_tsyvinda
-POSTGRES_PASSWORD=<random>
-POSTGRES_DB=app
-DATABASE_URL=postgresql://api_tsyvinda:<random>@postgres:5432/app
-
-REDIS_URL=redis://redis:6379
-```
-
-Generate random:
-
-```bash
-openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 40
-```
-
-`POSTGRES_PASSWORD` and the password in `DATABASE_URL` **must match exactly**. Avoid `@ : / # ?` in passwords (break the URL) — the `tr -dc 'A-Za-z0-9'` filter above ensures alnum-only.
-
-Copy to droplet from your laptop:
-
-```bash
-scp .env.production deploy@<droplet-ip>:~/app/.env
-ssh deploy@<droplet-ip> "chmod 600 ~/app/.env"
-```
-
-### 11. Start the stack
-
-```bash
-ssh deploy@<droplet-ip>
-cd ~/app
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
-Verify all 5 services up:
-
-```bash
-docker compose -f docker-compose.prod.yml ps
-# expected: nginx-proxy, acme-companion, app, postgres, redis — all "running" / "healthy"
-```
-
-Watch acme-companion issue the cert:
-
-```bash
-docker compose -f docker-compose.prod.yml logs -f acme-companion
-# look for: "Creating/renewal of api.tsyvinda.com certificates"
-```
-
-### 12. Verify
-
-```bash
-curl -i https://api.tsyvinda.com/health
-# HTTP/2 200
-# {"status":"ok","db":true,"redis":true}
-```
-
-Open Swagger UI: `https://api.tsyvinda.com/docs`.
-
----
-
-## Production — updates
-
-### Update app code
-
-```bash
-cd ~/app
-git pull
-docker compose -f docker-compose.prod.yml up -d --build app
-```
-
-Only `app` rebuilds; Postgres/Redis/nginx untouched.
-
-### Update base images (postgres / redis / nginx-proxy / acme-companion)
-
-```bash
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
-docker image prune -f
-```
-
-> Postgres major upgrade (e.g. 18 → 19) is **not** automatic. Dump → upgrade → restore. See [Backups](#backups).
-
-### Update system
-
-```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt autoremove -y
-sudo reboot   # if kernel updated
-```
-
-### Restart app without redeploy
-
-```bash
-docker compose -f docker-compose.prod.yml restart app
-```
-
-### Tail logs
-
-```bash
-docker compose -f docker-compose.prod.yml logs -f app
-docker compose -f docker-compose.prod.yml logs -f nginx-proxy
-docker compose -f docker-compose.prod.yml logs -f acme-companion
-```
-
-### Disk cleanup
-
-```bash
-docker system prune -af
-sudo journalctl --vacuum-time=7d
-```
-
----
-
-## Database access
-
-Postgres in prod is bound to `127.0.0.1:5432` on the droplet — not reachable from the public internet. Access via SSH tunnel.
-
-### SSH tunnel (DBeaver / TablePlus / psql)
-
-From your laptop:
-
-```bash
-ssh -fN -L 5433:127.0.0.1:5432 deploy@<droplet-ip>
-# -f background, -N no shell
-```
-
-Connect a client to `localhost:5433`:
-
-| Field    | Value                           |
-| -------- | ------------------------------- |
-| Host     | `localhost`                     |
-| Port     | `5433`                          |
-| User     | `api_tsyvinda` (from `.env`)    |
-| Password | `POSTGRES_PASSWORD` from `.env` |
-| Database | `app`                           |
-
-Close the tunnel:
-
-```bash
-pkill -f "ssh -fN -L 5433"
-```
-
-### psql directly inside the container
-
-```bash
-ssh deploy@<droplet-ip>
-cd ~/app
-docker compose -f docker-compose.prod.yml exec postgres \
-  psql -U api_tsyvinda -d app
-```
-
----
-
-## Backups
-
-### One-off dump (prod → laptop)
-
-```bash
-ssh deploy@<droplet-ip> "docker compose -f ~/app/docker-compose.prod.yml exec -T postgres \
-  pg_dump -U api_tsyvinda -d app -Fc" > backup-$(date +%F).dump
-```
-
-### Restore to local dev DB
+### Restore a dump to the local dev DB
 
 ```bash
 docker compose up -d postgres
 docker compose exec -T postgres \
-  pg_restore -U postgres -d app --clean --if-exists < backup-2026-05-15.dump
+  pg_restore -U postgres -d app --clean --if-exists < backup.dump
 ```
-
-### Restore to prod (destructive — `--clean` drops tables)
-
-```bash
-cat local-backup.dump | ssh deploy@<droplet-ip> \
-  "docker compose -f ~/app/docker-compose.prod.yml exec -T postgres \
-   pg_restore -U api_tsyvinda -d app --clean --if-exists"
-```
-
-### Nightly backup cron
-
-`/etc/cron.d/api-backup` on droplet:
-
-```cron
-0 3 * * * deploy cd /home/deploy/app && docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U api_tsyvinda -d app -Fc | gzip > /home/deploy/backups/db-$(date +\%F).dump.gz && find /home/deploy/backups -name 'db-*.dump.gz' -mtime +14 -delete
-```
-
-Nightly dump to `~/backups`, gzip, 14-day retention. Push to S3/Backblaze separately for off-site copy.
 
 ---
 
@@ -466,28 +166,25 @@ Nightly dump to `~/backups`, gzip, 14-day retention. Push to S3/Backblaze separa
 | ---------------------- | ---------------------- | ------------------------------------- |
 | `NODE_ENV`             | `development`          | `production`                          |
 | `PORT`                 | `3000`                 | optional                              |
-| `COMPOSE_PROJECT_NAME` | `api-tsyvinda-local`   | yes                                   |
-| `RESTART_POLICY`       | `no`                   | n/a (prod hardcoded `unless-stopped`) |
+| `COMPOSE_PROJECT_NAME` | `api-tsyvinda-local`   | n/a (local compose only)              |
+| `RESTART_POLICY`       | `no`                   | n/a (local compose only)              |
 | `BACKEND_HOST`         | `api.tsyvinda.local`   | real domain                           |
 | `FRONTEND_HOST`        | `https://tsyvinda.com` | yes (CORS origin)                     |
-| `LETSENCRYPT_EMAIL`    | —                      | yes                                   |
 | `POSTGRES_USER`        | `postgres`             | yes                                   |
 | `POSTGRES_PASSWORD`    | `postgres`             | strong random                         |
 | `POSTGRES_DB`          | `app`                  | yes                                   |
 | `DATABASE_URL`         | local connection       | match POSTGRES_PASSWORD               |
-| `REDIS_URL`            | local connection       | `redis://redis:6379` in compose       |
-| `BASIC_AUTH`           | `false`                | optional                              |
-| `BASIC_AUTH_USERNAME`  | `admin`                | only if `BASIC_AUTH=true`             |
-| `BASIC_AUTH_PASSWORD`  | `password`             | only if `BASIC_AUTH=true`             |
+| `REDIS_URL`            | local connection       | in-cluster Redis                      |
 | `JWT_ACCESS_SECRET`    | —                      | yes (≥32 random chars)                |
 | `JWT_ACCESS_TTL`       | `15m`                  | optional (e.g. `15m`, `1h`)           |
 | `REFRESH_TTL_DAYS`     | `30`                   | optional                              |
 | `BCRYPT_COST`          | `12`                   | optional (4 in tests for speed)       |
-| `RESEND_API_KEY`       | `test`                 | yes (`test` bypasses send)            |
+| `SMTP_HOST`            | `localhost` (Mailpit)  | yes (Resend SMTP relay)               |
+| `SMTP_PASS`            | —                      | yes (Resend API key)                  |
 | `EMAIL_FROM`           | —                      | yes (e.g. `Blog <noreply@x.com>`)     |
 | `COOKIE_DOMAIN`        | —                      | optional (`.tsyvinda.com` for shared) |
 
-`FRONTEND_HOST`, `DATABASE_URL`, `JWT_ACCESS_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` are validated at boot — app refuses to start without them.
+Env is validated at boot (`apps/api/src/shared/app.config.ts`) — the API refuses to start without `DATABASE_URL`, `JWT_ACCESS_SECRET`, `EMAIL_FROM`, `S3_BUCKET` and `S3_PUBLIC_URL`; in production also `SMTP_HOST` and `TURNSTILE_SECRET_KEY`.
 
 Generate a `JWT_ACCESS_SECRET`:
 
@@ -569,10 +266,9 @@ src/
   app.ts        # express setup (helmet, cors, rate-limit, cookie-parser, swagger, routes)
   index.ts      # entrypoint (boot, graceful shutdown)
 docker/
-  nginx-proxy/  # custom nginx-proxy image (basic auth, custom.conf)
+  nginx-proxy/  # local nginx-proxy config (custom.conf, MiniStack /s3 location)
 .github/workflows/ci.yml   # lint + typecheck + build + test
 docker-compose.yml         # dev
-docker-compose.prod.yml    # production (nginx-proxy + acme-companion + app + db + redis)
 Dockerfile                 # multi-stage: development / builder / production
 ```
 
@@ -593,16 +289,12 @@ docker compose version
 
 Volume contains data from a previous Postgres major version. Either:
 
-- restore from a dump (see [Backups](#backups)), or
-- if data is disposable: `docker compose -f docker-compose.prod.yml down` → `docker volume rm api-tsyvinda_postgres-data` → `up -d` (irreversible: wipes DB)
+- restore from a dump (see [Restore a dump](#restore-a-dump-to-the-local-dev-db)), or
+- if data is disposable: `docker compose down` → `docker volume rm <project>_postgres-data` → `up -d` (irreversible: wipes DB)
 
 ### `npm run build` exits with code 127
 
 Builder stage missing `devDependencies` (`tsc` not found). Ensure `npm ci --include=dev` in the builder stage (default Dockerfile already does this).
-
-### acme-companion fails to issue cert
-
-DNS not propagated yet. Check `dig +short api.tsyvinda.com` from the droplet. Wait, then `docker compose -f docker-compose.prod.yml restart acme-companion`. Let's Encrypt rate limit: 5 fails/hour per domain.
 
 ### Swagger UI shows "No operations defined in spec!"
 
@@ -610,13 +302,13 @@ Swagger looks for source files that don't exist in the prod image. Already fixed
 
 ### Swagger UI blank page / CSP errors in console
 
-`helmet()`'s default CSP blocks Swagger's inline init script. `src/app.ts` disables CSP for `/docs` only. Rebuild app: `docker compose -f docker-compose.prod.yml up -d --build app`.
+`helmet()`'s default CSP blocks Swagger's inline init script. `src/app.ts` disables CSP for `/docs` only. Rebuild app: `docker compose up -d --build app`.
 
 ### App can't connect to Postgres
 
 - Verify `POSTGRES_PASSWORD` matches the password inside `DATABASE_URL` exactly
 - Verify host in `DATABASE_URL` is `postgres` (service name), not `localhost`
-- `docker compose -f docker-compose.prod.yml logs postgres`
+- `docker compose logs postgres`
 
 ### Rate-limit returns 429 unexpectedly
 

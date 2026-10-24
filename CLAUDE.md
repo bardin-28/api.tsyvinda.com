@@ -130,7 +130,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 
 ## Environment
 
-- `.env.example` is the template; `.env.local` (dev), `.env.production` (droplet)
+- `.env.example` is the template for the local `.env`. Prod runs on K3s; its config lives in the infra repo (Helm values + the backend Secret), not in an env file here
 - `POSTGRES_PASSWORD` and the password embedded in `DATABASE_URL` must be byte-identical; avoid `@ : / # ?` chars (they break URL parsing — no auto-escape)
 - Local HTTPS dev: map `127.0.0.1 <BACKEND_HOST> <ADMIN_HOST>` in `/etc/hosts`, then `pnpm cert`; `docker compose up` serves the admin (Vite in the `admin` container) at `https://<ADMIN_HOST>/admin` and, via the `fe-proxy` service, the natively running fe (`npm run dev:local` in `../fe`, host :3000) at `https://tsyvinda.local` (keep it in `FRONTEND_HOST`; `/etc/hosts` needs `tsyvinda.local` too)
 - `config.isDev` controls TypeORM `synchronize` and `logging` — never enable in prod
