@@ -41,10 +41,20 @@ jobs:
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # ECR tags are immutable: on a re-run the SHA's image already exists and a second push
+      # fails, so skip the build and go straight to the tag bump.
       - name: Build and push image
         env:
+          REPO: ${{ vars.ECR_REPOSITORY }}
           IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
+          # batch-get-image (already granted to the CI role) lists a missing tag under failures, exit 0.
+          found=$(aws ecr batch-get-image --repository-name "$REPO" --image-ids imageTag="${{ github.sha }}" \
+            --query 'images[0].imageId.imageTag' --output text)
+          if [ "$found" = "${{ github.sha }}" ]; then
+            echo "$IMAGE already in ECR, skipping build"
+            exit 0
+          fi
           docker build -f apps/api/Dockerfile --target production -t "$IMAGE" .
           docker push "$IMAGE"
 
@@ -53,8 +63,16 @@ jobs:
       - name: Build and push admin image
         if: vars.ECR_ADMIN_REPOSITORY != ''
         env:
+          REPO: ${{ vars.ECR_ADMIN_REPOSITORY }}
           IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_ADMIN_REPOSITORY }}:${{ github.sha }}
         run: |
+          # batch-get-image (already granted to the CI role) lists a missing tag under failures, exit 0.
+          found=$(aws ecr batch-get-image --repository-name "$REPO" --image-ids imageTag="${{ github.sha }}" \
+            --query 'images[0].imageId.imageTag' --output text)
+          if [ "$found" = "${{ github.sha }}" ]; then
+            echo "$IMAGE already in ECR, skipping build"
+            exit 0
+          fi
           docker build -f apps/admin/Dockerfile --target runtime \
             --build-arg ADMIN_PUBLIC_API_URL="${{ vars.ADMIN_PUBLIC_API_URL }}" -t "$IMAGE" .
           docker push "$IMAGE"
