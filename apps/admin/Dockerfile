@@ -28,9 +28,11 @@ COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm turbo run build --filter=@tsyvinda/admin
 
-FROM nginx:1.27-alpine AS runtime
+# Unprivileged variant: nginx runs as uid 101 on :8080 and writes only to /tmp, so the
+# pod runs non-root with a read-only root filesystem (infra helm/admin).
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 COPY apps/admin/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/admin/dist /usr/share/nginx/html/admin
-EXPOSE 80
+EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=10s \
-    CMD wget -qO- http://127.0.0.1:80/admin/ || exit 1
+    CMD wget -qO- http://127.0.0.1:8080/admin/ || exit 1

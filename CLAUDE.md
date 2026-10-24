@@ -154,7 +154,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 
 - **Decorator metadata toolchain** (see Commands note) — dev/test must stay on ts-node/SWC, never tsx/esbuild, or Nest DI silently injects `undefined`. (The admin app uses Vite/esbuild freely — no Nest DI there.)
 - **pnpm strict layout** — only declared deps are importable. Augment Express types through the global `Express` namespace, not `express-serve-static-core`. New packages with install scripts must be listed in `allowBuilds` (`pnpm-workspace.yaml`).
-- **Dockerfiles build from the repo root**: `docker build -f apps/api/Dockerfile --target production .` (prod = `pnpm deploy --prod`), `docker build -f apps/admin/Dockerfile --build-arg ADMIN_PUBLIC_API_URL=… .`. The infra repo's `deploy-backend-local.sh` must pass `-f apps/api/Dockerfile`.
+- **Dockerfiles build from the repo root**: `docker build -f apps/api/Dockerfile --target production .` (prod = `pnpm deploy --prod`), `docker build -f apps/admin/Dockerfile --build-arg ADMIN_PUBLIC_API_URL=… .`. The admin runtime is `nginx-unprivileged` (uid 101, port **8080**, writes only `/tmp`; `absolute_redirect off` so redirects stay relative behind the ingress) — prod runs it non-root with a read-only root fs (infra `helm/admin`, `admin.tsyvinda.com`). The infra repo's `deploy-backend-local.sh` must pass `-f apps/api/Dockerfile`.
 - **Admin cookies are `Path=/admin`** — they never reach website routes; don't widen the path.
 - **TurnstileInterceptor ordering** — after `FileInterceptor` on multipart routes.
 - `/docs` runs a relaxed Helmet (CSP disabled) only for the `/docs` path so the Swagger init script loads; the global Helmet stays strict. Don't merge them.
