@@ -3,7 +3,7 @@
 
 .idea
 
-/node_modules
+node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -22,3 +22,8 @@ dist
 uploads
 .react-email
 .DS_Store
+
+# Turborepo / pnpm
+.turbo
+.pnpm-store/
+*.tsbuildinfo

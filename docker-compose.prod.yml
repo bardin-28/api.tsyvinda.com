@@ -65,6 +65,7 @@ services:
   app:
     build:
       context: .
+      dockerfile: apps/api/Dockerfile
       target: production
     init: true
     restart: unless-stopped
@@ -88,6 +89,9 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM=${EMAIL_FROM}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - ADMIN_HOST=${ADMIN_HOST:-}
+      - ADMIN_DEFAULT_EMAIL=${ADMIN_DEFAULT_EMAIL:-}
+      - ADMIN_DEFAULT_PASSWORD=${ADMIN_DEFAULT_PASSWORD:-}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
       - TURNSTILE_BYPASS_TOKEN=${TURNSTILE_BYPASS_TOKEN:-}
     deploy:

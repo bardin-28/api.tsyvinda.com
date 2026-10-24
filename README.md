@@ -1,8 +1,13 @@
-# test-be
+# tsyvinda.com — back-end
 
-Node.js / Express / TypeScript API with Docker support for local dev and production (DigitalOcean).
+pnpm + Turborepo monorepo:
 
-Stack: Express 4, TypeORM, Postgres 18.4, Redis 8, Swagger UI, Helmet, rate-limit, behind `nginx-proxy` + `acme-companion` for TLS in production.
+| Workspace                                            | Stack                                                                   |
+| ---------------------------------------------------- | ----------------------------------------------------------------------- |
+| `apps/api`                                           | NestJS 11 · TypeORM · Postgres 18 · Redis 8 · Swagger · cookie JWT auth |
+| `apps/admin`                                         | Admin panel: React-Admin 5 · MUI 9 · Vite (login + dashboard)           |
+| `packages/shared-types`                              | Types shared by api and admin                                           |
+| `packages/eslint-config`, `packages/prettier-config` | Shared lint / format config                                             |
 
 ---
 
@@ -13,6 +18,7 @@ Stack: Express 4, TypeORM, Postgres 18.4, Redis 8, Swagger UI, Helmet, rate-limi
 - [Development (Docker)](#development-docker)
 - [Development (local, no Docker)](#development-local-no-docker)
 - [Scripts](#scripts)
+- [Admin panel](#admin-panel)
 - [Production — first-time deploy](#production--first-time-deploy)
 - [Production — updates](#production--updates)
 - [Database access](#database-access)
@@ -27,7 +33,7 @@ Stack: Express 4, TypeORM, Postgres 18.4, Redis 8, Swagger UI, Helmet, rate-limi
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) + Docker Compose v2 (not v1; v1 is EOL and incompatible with current image format)
-- [Node.js 22](https://nodejs.org/) — only for local dev without Docker; see `.nvmrc`
+- [Node.js 22](https://nodejs.org/) (see `.nvmrc`) + `corepack enable` (pnpm version comes from `packageManager`)
 - [mkcert](https://github.com/FiloSottile/mkcert) — only for local HTTPS via nginx-proxy
 
 Verify compose v2 (note the space, not dash):
@@ -41,6 +47,8 @@ docker compose version
 
 ## Environment
 
+One `.env` at the repo root for every workspace:
+
 ```bash
 cp .env.example .env
 # edit .env with your values
@@ -49,29 +57,31 @@ cp .env.example .env
 For local HTTPS via nginx-proxy add to `/etc/hosts`:
 
 ```
-127.0.0.1 api.tsyvinda.local
+127.0.0.1 api.tsyvinda.local admin.tsyvinda.local tsyvinda.local
 ```
 
-Generate local mkcert TLS pair:
+Generate local mkcert TLS pairs:
 
 ```bash
-npm run cert
+pnpm cert
 ```
 
-This reads `BACKEND_HOST` from `.env.local` and writes `nginx-certs/<host>.crt` + `<host>.key`.
+This reads `BACKEND_HOST`, `ADMIN_HOST` and `FRONTEND_LOCAL_HOST` (default `tsyvinda.local`) from `.env` and writes `nginx-certs/<host>.crt` + `<host>.key` for each.
 
 ---
 
 ## Development (Docker)
 
-Runs app with hot-reload (nodemon + tsx). Postgres and Redis included; nginx-proxy provides HTTPS at `BACKEND_HOST`.
+Runs the API with hot-reload (nodemon + ts-node) and the admin panel (Vite dev server). Postgres, Redis, Mailpit and MiniStack included; nginx-proxy provides HTTPS.
 
 ```bash
 docker compose up --build
 ```
 
 - API (HTTPS): `https://api.tsyvinda.local`
-- Swagger UI: `https://api.tsyvinda.local/docs`
+- Swagger UI: `https://api.tsyvinda.local/docs` (admin API: `/docs-admin`)
+- Admin panel: `https://admin.tsyvinda.local/admin`
+- fe: `https://tsyvinda.local` — run `npm run dev:local` in `../fe` (next dev on the host's :3000; the `fe-proxy` service forwards to it, 502 while it isn't running). Keep `https://tsyvinda.local` in `FRONTEND_HOST`.
 - Postgres: `127.0.0.1:5432`
 - Redis: `127.0.0.1:6379`
 
@@ -87,30 +97,46 @@ docker compose down
 
 ## Development (local, no Docker)
 
-Run only Postgres + Redis in Docker, app natively:
+Run only the dependencies in Docker, the API natively:
 
 ```bash
-docker compose up -d postgres redis
-npm install
-npm run dev
+docker compose up -d postgres redis mailpit ministack s3-init
+pnpm install
+pnpm db:migration:run
+pnpm dev:api
 ```
 
-App reachable at `http://localhost:3000`.
+API reachable at `http://localhost:3000`. The admin panel needs HTTPS on `ADMIN_HOST` (its session cookies are `Secure`), so run it through compose.
 
 ---
 
 ## Scripts
 
-| Script                            | Purpose                        |
-| --------------------------------- | ------------------------------ |
-| `npm run dev`                     | Hot-reload via tsx + nodemon   |
-| `npm run build`                   | TypeScript compile to `dist/`  |
-| `npm start`                       | Run compiled output            |
-| `npm run typecheck`               | `tsc --noEmit`                 |
-| `npm run lint` / `lint:fix`       | ESLint                         |
-| `npm run format` / `format:check` | Prettier                       |
-| `npm test` / `test:watch`         | Vitest                         |
-| `npm run cert`                    | Generate local mkcert TLS pair |
+Run from the repo root.
+
+| Script                                          | Purpose                                          |
+| ----------------------------------------------- | ------------------------------------------------ |
+| `pnpm dev` / `dev:api` / `dev:admin`            | Hot-reload (api: nodemon + ts-node, admin: Vite) |
+| `pnpm build`                                    | Build every workspace                            |
+| `pnpm typecheck`                                | `tsc --noEmit` everywhere                        |
+| `pnpm lint` / `lint:fix`                        | ESLint                                           |
+| `pnpm format` / `format:check`                  | Prettier                                         |
+| `pnpm test`                                     | Vitest (api + admin)                             |
+| `pnpm db:migration:run` / `revert` / `generate` | TypeORM migrations (api)                         |
+| `pnpm email:dev`                                | React-email preview server                       |
+| `pnpm cert`                                     | Generate local mkcert TLS pairs                  |
+
+---
+
+## Admin panel
+
+React-Admin app in `apps/admin`, served under `/admin` on its own host (`ADMIN_HOST`, prod: `admin.tsyvinda.com`). It talks to the API's admin surface at `https://<BACKEND_HOST>/admin/*`.
+
+- **Sign-in**: `POST /admin/auth/login` — only users with `role = ADMIN`. Sessions use their own httpOnly cookies (`admin_access` / `admin_refresh`, `Path=/admin`), separate from the website session.
+- **Default admin**: `ADMIN_DEFAULT_EMAIL` / `ADMIN_DEFAULT_PASSWORD` (12+ chars). Created on API boot if missing; an existing user with that email is promoted to ADMIN; a password is never overwritten.
+- **Dashboard**: `GET /admin/dashboard` — user and post counts, latest signups.
+- **Posts**: create, edit and delete any post (`/admin/posts`), cover image upload, content editor with a Visual / HTML source switch. Post HTML is rendered as-is on the website — only admins can write it.
+- **Build**: `docker build -f apps/admin/Dockerfile --build-arg ADMIN_PUBLIC_API_URL=https://api.tsyvinda.com/admin .` — the API URL is baked in at build time (one image per environment).
 
 ---
 

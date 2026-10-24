@@ -11,13 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # corepack reads packageManager (pnpm@11) from package.json; must run before setup-node's pnpm cache.
+      - run: corepack enable
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - run: pnpm turbo run test
 
   # GitOps deploy: build → push ECR (keyless OIDC) → bump image tag in the infra
   # repo. CI never touches the cluster — ArgoCD reconciles the tag commit.
@@ -43,7 +45,18 @@ jobs:
         env:
           IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
-          docker build --target production -t "$IMAGE" .
+          docker build -f apps/api/Dockerfile --target production -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      # Admin panel image. Inert until the infra side exists (ECR repo + helm/admin chart) and
+      # ECR_ADMIN_REPOSITORY / ADMIN_PUBLIC_API_URL repo variables are set.
+      - name: Build and push admin image
+        if: vars.ECR_ADMIN_REPOSITORY != ''
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_ADMIN_REPOSITORY }}:${{ github.sha }}
+        run: |
+          docker build -f apps/admin/Dockerfile --target runtime \
+            --build-arg ADMIN_PUBLIC_API_URL="${{ vars.ADMIN_PUBLIC_API_URL }}" -t "$IMAGE" .
           docker push "$IMAGE"
 
       # Bump the prod image tag in the infra repo → ArgoCD picks it up.
@@ -54,10 +67,15 @@ jobs:
           token: ${{ secrets.INFRA_REPO_TOKEN }}
           path: infra
 
-      - name: Bump backend image tag
+      - name: Bump image tags
         working-directory: infra
+        env:
+          BUMP_ADMIN: ${{ vars.ECR_ADMIN_REPOSITORY != '' }}
         run: |
           yq -i '.image.tag = "${{ github.sha }}"' helm/backend/values-prod.yaml
+          if [ "$BUMP_ADMIN" = "true" ]; then
+            yq -i '.image.tag = "${{ github.sha }}"' helm/admin/values-prod.yaml
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "deploy(backend): ${{ github.sha }}"
