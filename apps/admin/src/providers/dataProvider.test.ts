@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { HttpError } from 'react-admin';
-import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { dataProvider, toRequestBody } from './dataProvider';
-import { apiClient } from '../services/apiClient';
+import { ApiError, apiClient } from '../services/apiClient';
 
 describe('dataProvider', () => {
   it('getList sends paging, sort and filters as query params and maps items/total', async () => {
@@ -42,15 +41,8 @@ describe('dataProvider', () => {
   });
 
   it('rejects with an RA HttpError carrying the API message', async () => {
-    const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
     vi.spyOn(apiClient, 'get').mockRejectedValue(
-      new AxiosError('fail', '404', config, null, {
-        status: 404,
-        statusText: '',
-        headers: {},
-        config,
-        data: { error: { code: 'NOT_FOUND', message: 'User not found' } },
-      }),
+      new ApiError('fail', 404, { error: { code: 'NOT_FOUND', message: 'User not found' } }),
     );
 
     const err = await dataProvider.getOne('users', { id: 'missing' }).catch((e: unknown) => e);

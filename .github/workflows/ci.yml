@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # corepack reads packageManager (pnpm@11) from package.json; must run before setup-node's pnpm cache.
+      # corepack reads packageManager (pnpm@12) from package.json; must run before setup-node's pnpm cache.
       - run: corepack enable
       - uses: actions/setup-node@v4
         with:

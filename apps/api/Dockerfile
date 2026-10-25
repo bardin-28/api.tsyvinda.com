@@ -2,7 +2,7 @@
 # Build from the repo root: docker build -f apps/api/Dockerfile --target production .
 ARG BUILD_JOBS=1
 
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 # corepack prompts before downloading pnpm — no TTY in docker build, so it hangs
@@ -27,7 +27,7 @@ RUN nice -n 10 pnpm turbo run build --filter=@tsyvinda/api
 # --legacy: the workspace doesn't use injected dependencies (inject-workspace-packages)
 RUN pnpm --filter=@tsyvinda/api --prod deploy --legacy /prod/api
 
-FROM node:22-alpine AS production
+FROM node:24-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
 ARG BUILD_JOBS
