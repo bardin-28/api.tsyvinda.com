@@ -6,7 +6,12 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { Role } from '@tsyvinda/shared-types';
+import {
+  THROTTLER_BLOCK_DURATION,
+  THROTTLER_LIMIT,
+} from '@nestjs/throttler/dist/throttler.constants';
 import { AdminAuthController } from './admin-auth.controller';
+import { AdminLoginLockoutService } from './admin-login-lockout.service';
 import { AdminGuard } from '../guards/admin.guard';
 import { AdminOriginGuard } from '../guards/admin-origin.guard';
 import { AuthService } from '../../modules/auth/services/auth.service';
@@ -43,6 +48,11 @@ const authMock = {
   getPublicUser: vi.fn(),
 };
 const usersRepoMock = { findOne: vi.fn() };
+const lockoutMock = {
+  assertNotLocked: vi.fn(),
+  recordFailure: vi.fn(),
+  reset: vi.fn(),
+};
 
 let app: NestExpressApplication;
 
@@ -53,6 +63,7 @@ beforeAll(async () => {
       AdminGuard,
       AdminOriginGuard,
       { provide: AuthService, useValue: authMock },
+      { provide: AdminLoginLockoutService, useValue: lockoutMock },
       { provide: getRepositoryToken(User), useValue: usersRepoMock },
     ],
   }).compile();
@@ -88,6 +99,9 @@ beforeEach(() => {
   authMock.logout.mockResolvedValue(undefined);
   authMock.getPublicUser.mockResolvedValue(adminUser);
   usersRepoMock.findOne.mockResolvedValue({ id: adminUser.id, role: Role.ADMIN });
+  lockoutMock.assertNotLocked.mockResolvedValue(undefined);
+  lockoutMock.recordFailure.mockResolvedValue(undefined);
+  lockoutMock.reset.mockResolvedValue(undefined);
 });
 
 const cookiesOf = (res: request.Response): string =>
@@ -124,6 +138,48 @@ describe('POST /admin/auth/login', () => {
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
     expect(cookiesOf(res)).toBe('');
+    expect(lockoutMock.recordFailure).toHaveBeenCalledWith('user@example.com');
+    expect(lockoutMock.reset).not.toHaveBeenCalled();
+  });
+
+  it('clears the failure counter after a successful login', async () => {
+    await request(app.getHttpServer())
+      .post('/admin/auth/login')
+      .set('Origin', ADMIN_ORIGIN)
+      .send({ email: 'Ada@Example.com', password: 'secret123' })
+      .expect(200);
+    expect(lockoutMock.reset).toHaveBeenCalledWith('ada@example.com');
+    expect(lockoutMock.recordFailure).not.toHaveBeenCalled();
+  });
+
+  it('does not count non-credential errors (e.g. unverified email) as failures', async () => {
+    authMock.login.mockRejectedValueOnce(
+      new HttpError(403, 'EMAIL_NOT_VERIFIED', 'Email is not verified'),
+    );
+    const res = await request(app.getHttpServer())
+      .post('/admin/auth/login')
+      .send({ email: 'ada@example.com', password: 'secret123' });
+    expect(res.status).toBe(403);
+    expect(lockoutMock.recordFailure).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 LOGIN_LOCKED for a locked account without checking the password', async () => {
+    lockoutMock.assertNotLocked.mockRejectedValueOnce(
+      new HttpError(429, 'LOGIN_LOCKED', 'Too many failed sign-in attempts. Try again later.'),
+    );
+    const res = await request(app.getHttpServer())
+      .post('/admin/auth/login')
+      .send({ email: 'ada@example.com', password: 'secret123' });
+    expect(res.status).toBe(429);
+    expect(res.body.error.code).toBe('LOGIN_LOCKED');
+    expect(authMock.login).not.toHaveBeenCalled();
+    expect(cookiesOf(res)).toBe('');
+  });
+
+  it('throttles to 5/min per IP and then blocks the IP for 15 minutes', () => {
+    const handler = AdminAuthController.prototype.login;
+    expect(Reflect.getMetadata(`${THROTTLER_LIMIT}default`, handler)).toBe(5);
+    expect(Reflect.getMetadata(`${THROTTLER_BLOCK_DURATION}default`, handler)).toBe(15 * 60_000);
   });
 
   it('rejects a write from a foreign origin with 403', async () => {

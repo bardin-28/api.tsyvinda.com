@@ -55,6 +55,14 @@ describe('loadConfig', () => {
     expect(cfg.isDev).toBe(false);
   });
 
+  it('disables Swagger in production unless SWAGGER_ENABLED=true', () => {
+    const prod = { ...baseEnv, NODE_ENV: 'production', TURNSTILE_SECRET_KEY: 'secret' };
+    expect(loadConfig(baseEnv).swaggerEnabled).toBe(true);
+    expect(loadConfig(prod).swaggerEnabled).toBe(false);
+    expect(loadConfig({ ...prod, SWAGGER_ENABLED: 'true' }).swaggerEnabled).toBe(true);
+    expect(loadConfig({ ...baseEnv, SWAGGER_ENABLED: 'false' }).swaggerEnabled).toBe(false);
+  });
+
   it('leaves turnstile.secretKey undefined when unset in development', () => {
     const cfg = loadConfig(baseEnv);
     expect(cfg.turnstile.secretKey).toBeUndefined();
