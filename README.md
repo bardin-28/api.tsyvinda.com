@@ -620,7 +620,7 @@ Swagger looks for source files that don't exist in the prod image. Already fixed
 
 ### Rate-limit returns 429 unexpectedly
 
-`app.set('trust proxy', 1)` accepts 1 hop. If you add Cloudflare or another proxy in front of nginx-proxy, increase the hop count in `src/app.ts`.
+`app.set('trust proxy', config.trustProxyHops)` — `TRUST_PROXY_HOPS` (default 1) is the number of trusted proxies in front of the API. Raise it only when another proxy that appends to `X-Forwarded-For` sits in front (e.g. Traefik behind Cloudflare in prod = 2).
 
 ### Out of disk space
 

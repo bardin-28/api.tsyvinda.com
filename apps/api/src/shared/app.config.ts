@@ -5,6 +5,12 @@ const envSchema = z
     PORT: z.coerce.number().int().positive().default(3000),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     BACKEND_HOST: z.string().min(1).default('localhost'),
+    // Express `trust proxy` hop count: how many X-Forwarded-For entries (from the right) are
+    // proxies, so req.ip (rate limits, login IP block) is the visitor. 1 = one proxy in front
+    // (nginx-proxy locally, ingress-nginx in prod, which already rewrites the IP from
+    // CF-Connecting-IP). 2 = Traefik behind Cloudflare: Traefik trusts XFF only from Cloudflare
+    // ranges and appends the edge, so the visitor is the second entry from the right.
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(1).max(5).default(1),
     FRONTEND_HOST: z
       .string()
       .default('')
@@ -119,6 +125,7 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     swaggerEnabled: e.SWAGGER_ENABLED ? e.SWAGGER_ENABLED === 'true' : e.NODE_ENV !== 'production',
     backendHost: e.BACKEND_HOST,
     frontendHost: e.FRONTEND_HOST,
+    trustProxyHops: e.TRUST_PROXY_HOPS,
     db: { url: e.DATABASE_URL },
     redis: { url: e.REDIS_URL },
     ssl: { keyPath: e.SSL_KEY_PATH, certPath: e.SSL_CERT_PATH },

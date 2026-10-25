@@ -134,7 +134,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 - `POSTGRES_PASSWORD` and the password embedded in `DATABASE_URL` must be byte-identical; avoid `@ : / # ?` chars (they break URL parsing — no auto-escape)
 - Local HTTPS dev: map `127.0.0.1 <BACKEND_HOST> <ADMIN_HOST>` in `/etc/hosts`, then `pnpm cert`; `docker compose up` serves the admin (Vite in the `admin` container) at `https://<ADMIN_HOST>` and, via the `fe-proxy` service, the natively running fe (`npm run dev:local` in `../fe`, host :3000) at `https://tsyvinda.local` (keep it in `FRONTEND_HOST`; `/etc/hosts` needs `tsyvinda.local` too)
 - `config.isDev` controls TypeORM `synchronize` and `logging` — never enable in prod
-- `app.set('trust proxy', 1)` trusts exactly one hop (ingress-nginx / nginx-proxy). Prod is behind Cloudflare: ingress-nginx rewrites the client IP from `CF-Connecting-IP` (Cloudflare ranges only, infra `helm/values/ingress-nginx-prod.yaml`), so `req.ip` is the real visitor — don't raise the hop count
+- `app.set('trust proxy', config.trustProxyHops)` — `TRUST_PROXY_HOPS`, default 1 (nginx-proxy locally; ingress-nginx in prod, which rewrites the client IP from `CF-Connecting-IP` for Cloudflare ranges only). Prod moves to Traefik + Gateway API (infra `docs/plans/gateway-api-migration.md`): Traefik trusts `X-Forwarded-For` only from Cloudflare ranges and appends the edge, so prod then needs `TRUST_PROXY_HOPS=2`. With 1 behind Traefik, `req.ip` would be the Cloudflare edge for every visitor (rate limits, login IP block). Never set it higher than the real number of trusted proxies — extra hops let clients spoof `X-Forwarded-For`
 
 ## Testing
 

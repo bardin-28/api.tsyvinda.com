@@ -30,6 +30,15 @@ describe('loadConfig', () => {
     expect(cfg.port).toBe(4000);
   });
 
+  it('trusts one proxy hop by default and coerces TRUST_PROXY_HOPS', () => {
+    expect(loadConfig(baseEnv).trustProxyHops).toBe(1);
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY_HOPS: '2' }).trustProxyHops).toBe(2);
+  });
+
+  it.each(['0', '6', 'abc', '1.5'])('rejects TRUST_PROXY_HOPS=%s', (hops) => {
+    expect(() => loadConfig({ ...baseEnv, TRUST_PROXY_HOPS: hops })).toThrow(/Invalid environment/);
+  });
+
   it('rejects non-numeric PORT', () => {
     expect(() => loadConfig({ ...baseEnv, PORT: 'abc' })).toThrow(/Invalid environment/);
   });
