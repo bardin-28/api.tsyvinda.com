@@ -104,7 +104,7 @@ services:
       mailpit:
         condition: service_started
 
-  # Admin panel (Vite dev server) at https://${ADMIN_HOST}/admin via nginx-proxy.
+  # Admin panel (Vite dev server) at https://${ADMIN_HOST} via nginx-proxy.
   admin:
     build:
       context: .

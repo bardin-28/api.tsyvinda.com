@@ -79,8 +79,8 @@ docker compose up --build
 ```
 
 - API (HTTPS): `https://api.tsyvinda.local`
-- Swagger UI: `https://api.tsyvinda.local/docs` (admin API: `/docs-admin`)
-- Admin panel: `https://admin.tsyvinda.local/admin`
+- Swagger UI: `https://api.tsyvinda.local/docs` (admin API: `/docs-admin`) — off when `NODE_ENV=production` unless `SWAGGER_ENABLED=true`
+- Admin panel: `https://admin.tsyvinda.local`
 - fe: `https://tsyvinda.local` — run `npm run dev:local` in `../fe` (next dev on the host's :3000; the `fe-proxy` service forwards to it, 502 while it isn't running). Keep `https://tsyvinda.local` in `FRONTEND_HOST`.
 - Postgres: `127.0.0.1:5432`
 - Redis: `127.0.0.1:6379`
@@ -130,7 +130,7 @@ Run from the repo root.
 
 ## Admin panel
 
-React-Admin app in `apps/admin`, served under `/admin` on its own host (`ADMIN_HOST`, prod: `admin.tsyvinda.com`). It talks to the API's admin surface at `https://<BACKEND_HOST>/admin/*`.
+React-Admin app in `apps/admin`, served at the root of its own host (`ADMIN_HOST`, prod: `admin.tsyvinda.com`). It talks to the API's admin surface at `https://<BACKEND_HOST>/admin/*`.
 
 - **Sign-in**: `POST /admin/auth/login` — only users with `role = ADMIN`. Sessions use their own httpOnly cookies (`admin_access` / `admin_refresh`, `Path=/admin`), separate from the website session.
 - **Default admin**: `ADMIN_DEFAULT_EMAIL` / `ADMIN_DEFAULT_PASSWORD` (12+ chars). Created on API boot if missing; an existing user with that email is promoted to ADMIN; a password is never overwritten.
@@ -326,7 +326,7 @@ curl -i https://api.tsyvinda.com/health
 # {"status":"ok","db":true,"redis":true}
 ```
 
-Open Swagger UI: `https://api.tsyvinda.com/docs`.
+Swagger UI is disabled in production (`SWAGGER_ENABLED` unset); set `SWAGGER_ENABLED=true` to expose `/docs`.
 
 ---
 

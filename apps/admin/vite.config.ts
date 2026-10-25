@@ -11,7 +11,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ENV_DIR, '');
 
   return {
-    base: '/admin',
     envDir: ENV_DIR,
     envPrefix: ENV_PREFIX,
     plugins: [react()],

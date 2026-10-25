@@ -46,6 +46,9 @@ const envSchema = z
       .string()
       .min(12, 'ADMIN_DEFAULT_PASSWORD must be at least 12 chars')
       .optional(),
+    // Swagger UI + OpenAPI JSON (/docs, /docs-admin). Unset = on everywhere except
+    // NODE_ENV=production; local k3d (also production) opts back in with "true".
+    SWAGGER_ENABLED: z.enum(['true', 'false']).optional(),
     TURNSTILE_SECRET_KEY: z.string().optional(),
     // Escape hatch for testing protected endpoints (e.g. Swagger /docs on
     // production) where no real Turnstile widget is rendered. When set, sending
@@ -113,6 +116,7 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     nodeEnv: e.NODE_ENV,
     isDev: e.NODE_ENV === 'development',
     isProd: e.NODE_ENV === 'production',
+    swaggerEnabled: e.SWAGGER_ENABLED ? e.SWAGGER_ENABLED === 'true' : e.NODE_ENV !== 'production',
     backendHost: e.BACKEND_HOST,
     frontendHost: e.FRONTEND_HOST,
     db: { url: e.DATABASE_URL },

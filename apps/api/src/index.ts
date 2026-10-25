@@ -87,38 +87,41 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('API')
-    .setVersion('1.0.0')
-    .addServer(`https://${config.backendHost}`)
-    .addCookieAuth('access', { type: 'apiKey', in: 'cookie', name: 'access' }, 'cookieAuth')
-    .build();
-  SwaggerModule.setup(
-    '/docs',
-    app,
-    SwaggerModule.createDocument(app, swaggerConfig, {
-      include: [HealthModule, AuthModule, UsersModule, PostsModule],
-    }),
-  );
+  // Off in prod by default (SWAGGER_ENABLED): no public map of the API surface.
+  if (config.swaggerEnabled) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('API')
+      .setVersion('1.0.0')
+      .addServer(`https://${config.backendHost}`)
+      .addCookieAuth('access', { type: 'apiKey', in: 'cookie', name: 'access' }, 'cookieAuth')
+      .build();
+    SwaggerModule.setup(
+      '/docs',
+      app,
+      SwaggerModule.createDocument(app, swaggerConfig, {
+        include: [HealthModule, AuthModule, UsersModule, PostsModule],
+      }),
+    );
 
-  // Admin surface gets its own document; /docs-admin still matches the relaxed /docs Helmet.
-  const adminSwaggerConfig = new DocumentBuilder()
-    .setTitle('Admin API')
-    .setVersion('1.0.0')
-    .addServer(`https://${config.backendHost}`)
-    .addCookieAuth(
-      ADMIN_ACCESS_COOKIE_NAME,
-      { type: 'apiKey', in: 'cookie', name: ADMIN_ACCESS_COOKIE_NAME },
-      ADMIN_ACCESS_COOKIE_NAME,
-    )
-    .build();
-  SwaggerModule.setup(
-    '/docs-admin',
-    app,
-    SwaggerModule.createDocument(app, adminSwaggerConfig, {
-      include: ADMIN_API_MODULES,
-    }),
-  );
+    // Admin surface gets its own document; /docs-admin still matches the relaxed /docs Helmet.
+    const adminSwaggerConfig = new DocumentBuilder()
+      .setTitle('Admin API')
+      .setVersion('1.0.0')
+      .addServer(`https://${config.backendHost}`)
+      .addCookieAuth(
+        ADMIN_ACCESS_COOKIE_NAME,
+        { type: 'apiKey', in: 'cookie', name: ADMIN_ACCESS_COOKIE_NAME },
+        ADMIN_ACCESS_COOKIE_NAME,
+      )
+      .build();
+    SwaggerModule.setup(
+      '/docs-admin',
+      app,
+      SwaggerModule.createDocument(app, adminSwaggerConfig, {
+        include: ADMIN_API_MODULES,
+      }),
+    );
+  }
 
   app.enableShutdownHooks();
 
@@ -127,7 +130,7 @@ async function bootstrap(): Promise<void> {
 
   await app.listen(config.port, '0.0.0.0');
   logger.info({ port: config.port }, 'Server listening');
-  if (config.isDev) {
+  if (config.isDev && config.swaggerEnabled) {
     logger.info(`Docs → https://${config.backendHost}/docs (admin: /docs-admin)`);
   }
 

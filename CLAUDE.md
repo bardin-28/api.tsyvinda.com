@@ -9,7 +9,7 @@ pnpm 11 + Turborepo monorepo:
 | Workspace                                            | What                                                                                          |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `apps/api`                                           | NestJS API (everything below) — `@tsyvinda/api`                                               |
-| `apps/admin`                                         | Admin panel: React-Admin 5 · MUI 9 · Vite, served at `/admin` — `@tsyvinda/admin`             |
+| `apps/admin`                                         | Admin panel: React-Admin 5 · MUI 9 · Vite, served at `/` of `ADMIN_HOST` — `@tsyvinda/admin`  |
 | `packages/shared-types`                              | Types shared by api + admin (`User`, `Role`, `AuthSession`, `DashboardStats`, `ApiErrorBody`) |
 | `packages/eslint-config`, `packages/prettier-config` | Shared lint/format config (root `eslint.config.mjs` adds node/browser globals)                |
 
@@ -20,7 +20,7 @@ API stack:
 - `class-validator` / `class-transformer` for request DTO validation (global `ValidationPipe`)
 - TypeORM 0.3 (decorators) on PostgreSQL 18 via `@nestjs/typeorm`
 - ioredis on Redis 8 (wrapped as a Nest provider; also backs the throttler)
-- `@nestjs/swagger` (decorator-generated OpenAPI) on `/docs`
+- `@nestjs/swagger` (decorator-generated OpenAPI) on `/docs` — off in production unless `SWAGGER_ENABLED=true`
 - React Email templates (`src/emails/*.tsx`) rendered via `@react-email/render`, sent through Resend
 - Vitest (node env)
 
@@ -132,7 +132,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 
 - `.env.example` is the template; `.env.local` (dev), `.env.production` (droplet)
 - `POSTGRES_PASSWORD` and the password embedded in `DATABASE_URL` must be byte-identical; avoid `@ : / # ?` chars (they break URL parsing — no auto-escape)
-- Local HTTPS dev: map `127.0.0.1 <BACKEND_HOST> <ADMIN_HOST>` in `/etc/hosts`, then `pnpm cert`; `docker compose up` serves the admin (Vite in the `admin` container) at `https://<ADMIN_HOST>/admin` and, via the `fe-proxy` service, the natively running fe (`npm run dev:local` in `../fe`, host :3000) at `https://tsyvinda.local` (keep it in `FRONTEND_HOST`; `/etc/hosts` needs `tsyvinda.local` too)
+- Local HTTPS dev: map `127.0.0.1 <BACKEND_HOST> <ADMIN_HOST>` in `/etc/hosts`, then `pnpm cert`; `docker compose up` serves the admin (Vite in the `admin` container) at `https://<ADMIN_HOST>` and, via the `fe-proxy` service, the natively running fe (`npm run dev:local` in `../fe`, host :3000) at `https://tsyvinda.local` (keep it in `FRONTEND_HOST`; `/etc/hosts` needs `tsyvinda.local` too)
 - `config.isDev` controls TypeORM `synchronize` and `logging` — never enable in prod
 - `app.set('trust proxy', 1)` is set for the existing nginx-proxy; revisit if adding Cloudflare in front
 
