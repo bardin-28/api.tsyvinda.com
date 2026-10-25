@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import request from 'supertest';
 import { ADMIN_API_MODULES, AdminApiModule } from './admin-api.module';
 import { AdminBootstrapService } from './auth/admin-bootstrap.service';
+import { AdminLoginLockoutService } from './auth/admin-login-lockout.service';
 import { AdminPostsService } from './posts/admin-posts.service';
 import { S3Module } from '../shared/s3/s3.module';
 import { S3Service } from '../shared/s3/s3.service';
@@ -27,6 +28,8 @@ beforeAll(async () => {
     .overrideProvider(AuthService)
     .useValue({})
     .overrideProvider(AdminBootstrapService)
+    .useValue({})
+    .overrideProvider(AdminLoginLockoutService)
     .useValue({})
     .overrideProvider(AdminPostsService)
     .useValue({})
