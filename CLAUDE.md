@@ -143,7 +143,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 - **New features require Vitest tests.** Cover the controller/service. Admin views: Vitest + RTL inside RA's `<AdminContext>` with a mocked dataProvider/authProvider; providers mock `apiClient`.
 - supertest binds a local port: inside the Claude sandbox api HTTP tests fail with `listen EPERM` (sandbox, not code).
 - CI runs `pnpm turbo run build` → `test` (`.github/workflows/ci.yml`). `format:check`/`lint`/`typecheck` are local-only — run `pnpm typecheck && pnpm test` before pushing.
-- Deploy job builds `apps/api/Dockerfile` (always) and `apps/admin/Dockerfile` (only when the `ECR_ADMIN_REPOSITORY` repo variable is set; `ADMIN_PUBLIC_API_URL` is baked at build time).
+- Deploy job builds `apps/api/Dockerfile` (always) and `apps/admin/Dockerfile` (only when `ECR_ADMIN_REPOSITORY` is set; deploy config comes from Infisical prod `/CI` + `/CI/BE` via OIDC; `ADMIN_PUBLIC_API_URL` is baked at build time).
 
 ## Git workflow
 
