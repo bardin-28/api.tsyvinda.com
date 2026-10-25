@@ -1,4 +1,3 @@
-import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { HttpError } from 'react-admin';
 import type { ApiErrorBody } from '@tsyvinda/shared-types';
 import { clearSession } from '../auth/sessionStore';
@@ -8,22 +7,84 @@ export const AUTH_REFRESH_PATH = '/auth/refresh';
 export const AUTH_LOGOUT_PATH = '/auth/logout';
 export const AUTH_ME_PATH = '/auth/me';
 
-// withCredentials: the API authenticates the panel by its httpOnly admin_* cookies, never a header.
-// No fixed Content-Type: axios picks JSON for objects and multipart (with boundary) for FormData;
-// a JSON default would make it serialize FormData uploads to JSON.
-export const apiClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.ADMIN_PUBLIC_API_URL,
-  withCredentials: true,
-});
+const BASE_URL = (import.meta.env.ADMIN_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
 
-// Separate instance so the refresh call never re-enters the 401 interceptor (exported for tests)
-export const refreshClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.ADMIN_PUBLIC_API_URL,
-  withCredentials: true,
-});
+export interface ApiResponse<T> {
+  data: T;
+}
 
-interface RetriableConfig extends InternalAxiosRequestConfig {
-  _retried?: boolean;
+export interface RequestOptions {
+  params?: Record<string, unknown>;
+}
+
+/** A failed API call. `status` is undefined when no response arrived (network failure). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | undefined,
+    readonly data?: unknown,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = 'ApiError';
+  }
+}
+
+// Same shape axios produced: null/undefined dropped, arrays as `key[]`, objects as JSON.
+function toQuery(params: Record<string, unknown> | undefined): string {
+  if (!params) return '';
+  const search = new URLSearchParams();
+  const append = (key: string, value: unknown) => {
+    if (value === null || value === undefined) return;
+    if (value instanceof Date) search.append(key, value.toISOString());
+    else if (typeof value === 'object') search.append(key, JSON.stringify(value));
+    else search.append(key, String(value));
+  };
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) value.forEach((item) => append(`${key}[]`, item));
+    else append(key, value);
+  }
+  const query = search.toString();
+  return query ? `?${query}` : '';
+}
+
+function parseBody(text: string): unknown {
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+// credentials: the API authenticates the panel by its httpOnly admin_* cookies, never a header.
+// FormData goes out untouched so fetch sets the multipart boundary itself; objects go as JSON.
+async function send<T>(
+  method: string,
+  path: string,
+  body: unknown,
+  options: RequestOptions | undefined,
+): Promise<ApiResponse<T>> {
+  const init: RequestInit = { method, credentials: 'include' };
+  if (body instanceof FormData) {
+    init.body = body;
+  } else if (body !== undefined) {
+    init.body = JSON.stringify(body);
+    init.headers = { 'Content-Type': 'application/json' };
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}${toQuery(options?.params)}`, init);
+  } catch (cause) {
+    throw new ApiError('Network Error', undefined, undefined, { cause });
+  }
+
+  const data = parseBody(await res.text());
+  if (!res.ok) {
+    throw new ApiError(`Request failed with status code ${res.status}`, res.status, data);
+  }
+  return { data: data as T };
 }
 
 // Concurrent 401s share one refresh, otherwise each would rotate the refresh cookie and replay the old one
@@ -31,44 +92,55 @@ let inFlightRefresh: Promise<boolean> | null = null;
 
 async function refreshSession(): Promise<boolean> {
   try {
-    await refreshClient.post(AUTH_REFRESH_PATH);
+    await send('POST', AUTH_REFRESH_PATH, undefined, undefined);
     return true;
   } catch {
     return false;
   }
 }
 
-const isAuthEndpoint = (url: string | undefined): boolean =>
-  !!url &&
-  [AUTH_LOGIN_PATH, AUTH_REFRESH_PATH, AUTH_LOGOUT_PATH].some((path) => url.endsWith(path));
+const isAuthEndpoint = (path: string): boolean =>
+  [AUTH_LOGIN_PATH, AUTH_REFRESH_PATH, AUTH_LOGOUT_PATH].some((p) => path.endsWith(p));
 
-apiClient.interceptors.response.use(undefined, async (error: unknown) => {
-  if (!(error instanceof AxiosError) || error.response?.status !== 401) {
-    throw error;
+// A 401 triggers one cookie refresh and a single replay of the original request.
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  options?: RequestOptions,
+): Promise<ApiResponse<T>> {
+  try {
+    return await send<T>(method, path, body, options);
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401 || isAuthEndpoint(path)) {
+      throw error;
+    }
+
+    inFlightRefresh ??= refreshSession().finally(() => {
+      inFlightRefresh = null;
+    });
+
+    if (!(await inFlightRefresh)) {
+      clearSession();
+      throw error;
+    }
+
+    return send<T>(method, path, body, options);
   }
+}
 
-  const config = error.config as RetriableConfig | undefined;
-  if (!config || config._retried || isAuthEndpoint(config.url)) {
-    throw error;
-  }
-
-  inFlightRefresh ??= refreshSession().finally(() => {
-    inFlightRefresh = null;
-  });
-
-  if (!(await inFlightRefresh)) {
-    clearSession();
-    throw error;
-  }
-
-  config._retried = true;
-  return apiClient.request(config);
-});
+export const apiClient = {
+  get: <T = unknown>(path: string, options?: RequestOptions) =>
+    request<T>('GET', path, undefined, options),
+  post: <T = unknown>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('POST', path, body, options),
+  patch: <T = unknown>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PATCH', path, body, options),
+  delete: <T = unknown>(path: string, options?: RequestOptions) =>
+    request<T>('DELETE', path, undefined, options),
+};
 
 export function extractErrorStatus(error: unknown): number | undefined {
-  if (error instanceof AxiosError) {
-    return error.response?.status ?? error.status;
-  }
   const status = (error as { status?: unknown } | null | undefined)?.status;
   return typeof status === 'number' ? status : undefined;
 }
@@ -94,12 +166,13 @@ export function toHttpError(error: unknown): HttpError {
   if (error instanceof HttpError) return error;
 
   const status = extractErrorStatus(error) ?? 500;
-  const body =
-    error instanceof AxiosError ? (error.response?.data as ApiErrorBody | undefined) : undefined;
+  const body = error instanceof ApiError ? (error.data as ApiErrorBody | undefined) : undefined;
   const apiError = body?.error;
   const message =
     apiError?.message ||
-    (error instanceof AxiosError && !error.response ? 'Network error: API unreachable' : '') ||
+    (error instanceof ApiError && error.status === undefined
+      ? 'Network error: API unreachable'
+      : '') ||
     (error instanceof Error ? error.message : 'Request failed');
 
   const errors = toFieldErrors(apiError?.details?.fieldErrors);

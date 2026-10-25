@@ -1,13 +1,4 @@
-import {
-  Body,
-  Button,
-  Container,
-  Head,
-  Heading,
-  Html,
-  Preview,
-  Text,
-} from '@react-email/components';
+import { Body, Button, Container, Head, Heading, Html, Preview, Text } from 'react-email';
 import * as styles from './welcome-email.styles';
 
 export interface WelcomeEmailProps {

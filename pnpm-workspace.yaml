@@ -10,6 +10,3 @@ allowBuilds:
   bcrypt: true
   esbuild: true
   unrs-resolver: true
-
-settings:
-  confirmModulesPurge: false

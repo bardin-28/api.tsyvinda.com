@@ -4,7 +4,7 @@ pnpm + Turborepo monorepo:
 
 | Workspace                                            | Stack                                                                   |
 | ---------------------------------------------------- | ----------------------------------------------------------------------- |
-| `apps/api`                                           | NestJS 11 · TypeORM · Postgres 18 · Redis 8 · Swagger · cookie JWT auth |
+| `apps/api`                                           | NestJS 12 · TypeORM · Postgres 18 · Redis 8 · Swagger · cookie JWT auth |
 | `apps/admin`                                         | Admin panel: React-Admin 5 · MUI 9 · Vite (login + dashboard)           |
 | `packages/shared-types`                              | Types shared by api and admin                                           |
 | `packages/eslint-config`, `packages/prettier-config` | Shared lint / format config                                             |
@@ -33,7 +33,7 @@ pnpm + Turborepo monorepo:
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) + Docker Compose v2 (not v1; v1 is EOL and incompatible with current image format)
-- [Node.js 22](https://nodejs.org/) (see `.nvmrc`) + `corepack enable` (pnpm version comes from `packageManager`)
+- [Node.js 24](https://nodejs.org/) (see `.nvmrc`) + `corepack enable` (pnpm version comes from `packageManager`)
 - [mkcert](https://github.com/FiloSottile/mkcert) — only for local HTTPS via nginx-proxy
 
 Verify compose v2 (note the space, not dash):

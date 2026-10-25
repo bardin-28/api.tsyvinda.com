@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Stack
 
-pnpm 11 + Turborepo monorepo:
+pnpm 12 + Turborepo monorepo:
 
 | Workspace                                            | What                                                                                          |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -15,13 +15,13 @@ pnpm 11 + Turborepo monorepo:
 
 API stack:
 
-- Node.js 22 (see `.nvmrc`), TypeScript strict mode
-- **NestJS 11 on the Express adapter (`@nestjs/platform-express`)** + Helmet + CORS + `@nestjs/throttler`
+- Node.js 24 (see `.nvmrc`), TypeScript strict mode
+- **NestJS 12 on the Express adapter (`@nestjs/platform-express`)** + Helmet + CORS + `@nestjs/throttler`
 - `class-validator` / `class-transformer` for request DTO validation (global `ValidationPipe`)
 - TypeORM 0.3 (decorators) on PostgreSQL 18 via `@nestjs/typeorm`
 - ioredis on Redis 8 (wrapped as a Nest provider; also backs the throttler)
 - `@nestjs/swagger` (decorator-generated OpenAPI) on `/docs` — off in production unless `SWAGGER_ENABLED=true`
-- React Email templates (`src/emails/*.tsx`) rendered via `@react-email/render`, sent through Resend
+- React Email templates (`src/emails/*.tsx`) (components from `react-email`) rendered via `@react-email/render`, sent through Resend
 - Vitest (node env)
 
 ## Commands
@@ -78,14 +78,14 @@ src/
                     `{ items, total }`, multipart cover upload, `removeImage`, empty description clears)
 ```
 
-Admin app (`apps/admin/src/`): `services/apiClient.ts` (axios, `withCredentials`, single-flight refresh on 401,
+Admin app (`apps/admin/src/`): `services/apiClient.ts` (thin `fetch` wrapper, `credentials: 'include'`, single-flight refresh on 401,
 `toHttpError` maps our error body to RA `HttpError`), `auth/` (authProvider + sessionStore: cached user is only a
 "signed in" hint), `providers/dataProvider.ts` (generic REST: `GET /<resource>` → `{ items, total }`, `page`,
 `perPage`, `sort`, `order`, filters as query params; plus `getDashboard`), `resources/resources.config.tsx`
 (single source for resources; views lazy-loaded), `resources/posts/` (list/create/edit/delete; `toPostPayload` maps the
 form to the API body), `components/HtmlEditorInput.tsx` (`ra-input-rich-text`/TipTap with a Visual ⇄ HTML source toggle),
 `pages/` (LoginPage, Dashboard), `layout/`, `theme/`. A form value holding `{ rawFile }` makes the dataProvider send
-multipart; apiClient deliberately has no default `Content-Type` (it would JSON-encode FormData).
+multipart; apiClient passes FormData through untouched (fetch sets the multipart boundary) and only JSON-encodes plain objects.
 
 ## Module pattern
 

@@ -2,7 +2,7 @@
 # Build from the repo root: docker build -f apps/admin/Dockerfile --build-arg ADMIN_PUBLIC_API_URL=... .
 # Vite bakes ADMIN_PUBLIC_* at build time — images are per-environment, not promotable.
 
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 # corepack prompts before downloading pnpm — no TTY in docker build, so it hangs

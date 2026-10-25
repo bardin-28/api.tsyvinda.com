@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { Role, type User } from '@tsyvinda/shared-types';
 import { authProvider } from './authProvider';
-import { apiClient } from '../services/apiClient';
+import { ApiError, apiClient } from '../services/apiClient';
 import { getUser, setUser } from './sessionStore';
 
 const admin: User = {
@@ -17,15 +16,8 @@ const admin: User = {
   createdAt: '2020-01-01T00:00:00.000Z',
 };
 
-const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
 const apiError = (status: number, message: string) =>
-  new AxiosError('fail', String(status), config, null, {
-    status,
-    statusText: '',
-    headers: {},
-    config,
-    data: { error: { code: 'X', message } },
-  });
+  new ApiError('fail', status, { error: { code: 'X', message } });
 
 beforeEach(() => {
   vi.restoreAllMocks();
