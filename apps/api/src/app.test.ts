@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response, NextFunction } from 'express';
@@ -70,6 +72,35 @@ describe('GET /health', () => {
   it('echoes incoming x-request-id header', async () => {
     const res = await request(app.getHttpServer()).get('/health').set('x-request-id', 'abc-123');
     expect(res.headers['x-request-id']).toBe('abc-123');
+  });
+});
+
+describe('GET /health rate limiting', () => {
+  let throttledApp: NestExpressApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 2 }] })],
+      controllers: [HealthController],
+      providers: [
+        { provide: getDataSourceToken(), useValue: mockDs },
+        { provide: REDIS, useValue: mockRedis },
+        { provide: APP_GUARD, useClass: ThrottlerGuard },
+      ],
+    }).compile();
+    throttledApp = moduleRef.createNestApplication<NestExpressApplication>();
+    await throttledApp.init();
+  });
+
+  afterAll(async () => {
+    await throttledApp.close();
+  });
+
+  it('is never throttled (kubelet probes must not get 429)', async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await request(throttledApp.getHttpServer()).get('/health');
+      expect(res.status).toBe(200);
+    }
   });
 });
 
