@@ -28,15 +28,40 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # assume the AWS deploy role via OIDC
+      id-token: write # Infisical + AWS deploy role via OIDC
       contents: read
     steps:
       - uses: actions/checkout@v4
 
+      # All deploy config comes from Infisical (prod). Keyless: the machine identity trusts
+      # this repo's GitHub OIDC token on main.
+      #   /CI    — shared with the fe repo: AWS_REGION, AWS_DEPLOY_ROLE_ARN,
+      #            INFRA_REPOSITORY, INFRA_REPO_TOKEN
+      #   /CI/BE — ECR_REPOSITORY, ECR_ADMIN_REPOSITORY, ADMIN_PUBLIC_API_URL
+      - name: Load shared CI env from Infisical
+        uses: Infisical/secrets-action@v1.0.18
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          domain: ${{ vars.INFISICAL_DOMAIN }}
+          project-id: e9e24553-ba29-4218-9050-8e5b0efcb707
+          env-slug: prod
+          secret-path: /CI
+
+      - name: Load backend CI env from Infisical
+        uses: Infisical/secrets-action@v1.0.18
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          domain: ${{ vars.INFISICAL_DOMAIN }}
+          project-id: e9e24553-ba29-4218-9050-8e5b0efcb707
+          env-slug: prod
+          secret-path: /CI/BE
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -45,8 +70,8 @@ jobs:
       # fails, so skip the build and go straight to the tag bump.
       - name: Build and push image
         env:
-          REPO: ${{ vars.ECR_REPOSITORY }}
-          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+          REPO: ${{ env.ECR_REPOSITORY }}
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
           # batch-get-image (already granted to the CI role) lists a missing tag under failures, exit 0.
           found=$(aws ecr batch-get-image --repository-name "$REPO" --image-ids imageTag="${{ github.sha }}" \
@@ -59,12 +84,12 @@ jobs:
           docker push "$IMAGE"
 
       # Admin panel image. Inert until the infra side exists (ECR repo + helm/admin chart) and
-      # ECR_ADMIN_REPOSITORY / ADMIN_PUBLIC_API_URL repo variables are set.
+      # ECR_ADMIN_REPOSITORY / ADMIN_PUBLIC_API_URL are set in Infisical (/CI/BE).
       - name: Build and push admin image
-        if: vars.ECR_ADMIN_REPOSITORY != ''
+        if: env.ECR_ADMIN_REPOSITORY != ''
         env:
-          REPO: ${{ vars.ECR_ADMIN_REPOSITORY }}
-          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_ADMIN_REPOSITORY }}:${{ github.sha }}
+          REPO: ${{ env.ECR_ADMIN_REPOSITORY }}
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_ADMIN_REPOSITORY }}:${{ github.sha }}
         run: |
           # batch-get-image (already granted to the CI role) lists a missing tag under failures, exit 0.
           found=$(aws ecr batch-get-image --repository-name "$REPO" --image-ids imageTag="${{ github.sha }}" \
@@ -74,21 +99,21 @@ jobs:
             exit 0
           fi
           docker build -f apps/admin/Dockerfile --target runtime \
-            --build-arg ADMIN_PUBLIC_API_URL="${{ vars.ADMIN_PUBLIC_API_URL }}" -t "$IMAGE" .
+            --build-arg ADMIN_PUBLIC_API_URL="${{ env.ADMIN_PUBLIC_API_URL }}" -t "$IMAGE" .
           docker push "$IMAGE"
 
       # Bump the prod image tag in the infra repo → ArgoCD picks it up.
       - name: Checkout infra repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ vars.INFRA_REPOSITORY }}
-          token: ${{ secrets.INFRA_REPO_TOKEN }}
+          repository: ${{ env.INFRA_REPOSITORY }}
+          token: ${{ env.INFRA_REPO_TOKEN }}
           path: infra
 
       - name: Bump image tags
         working-directory: infra
         env:
-          BUMP_ADMIN: ${{ vars.ECR_ADMIN_REPOSITORY != '' }}
+          BUMP_ADMIN: ${{ env.ECR_ADMIN_REPOSITORY != '' }}
         run: |
           yq -i '.image.tag = "${{ github.sha }}"' helm/backend/values-prod.yaml
           if [ "$BUMP_ADMIN" = "true" ]; then
