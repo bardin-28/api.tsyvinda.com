@@ -30,7 +30,7 @@ RUN pnpm turbo run build --filter=@tsyvinda/admin
 
 # Unprivileged variant: nginx runs as uid 101 on :8080 and writes only to /tmp, so the
 # pod runs non-root with a read-only root filesystem (infra helm/admin).
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
 COPY apps/admin/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/admin/dist /usr/share/nginx/html
 EXPOSE 8080

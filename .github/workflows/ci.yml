@@ -10,10 +10,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # corepack reads packageManager (pnpm@12) from package.json; must run before setup-node's pnpm cache.
       - run: corepack enable
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -31,7 +31,7 @@ jobs:
       id-token: write # Infisical + AWS deploy role via OIDC
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # All deploy config comes from Infisical (prod). Keyless: the machine identity trusts
       # this repo's GitHub OIDC token on main.
@@ -58,7 +58,7 @@ jobs:
           env-slug: prod
           secret-path: /CI/BE
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -104,7 +104,7 @@ jobs:
 
       # Bump the prod image tag in the infra repo → ArgoCD picks it up.
       - name: Checkout infra repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.INFRA_REPOSITORY }}
           token: ${{ env.INFRA_REPO_TOKEN }}
