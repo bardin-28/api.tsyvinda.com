@@ -35,7 +35,7 @@ const allowedOrigins = new Set<string>([
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
 
-  app.set('trust proxy', 1);
+  app.set('trust proxy', config.trustProxyHops);
   app.disable('x-powered-by');
 
   app.use(
