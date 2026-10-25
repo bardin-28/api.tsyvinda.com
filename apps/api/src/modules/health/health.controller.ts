@@ -1,6 +1,7 @@
 import { Controller, Get, Inject, Res } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { DataSource } from 'typeorm';
 import type { Redis } from 'ioredis';
@@ -8,6 +9,9 @@ import { REDIS } from '../../redis/redis.module';
 import { logger } from '../../shared/logger';
 
 @ApiTags('Health')
+// Kubelet probes hit /health every few seconds from the node IP; under the global
+// 100/60s limit a 429 fails the liveness probe and restarts the pod.
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
   constructor(
