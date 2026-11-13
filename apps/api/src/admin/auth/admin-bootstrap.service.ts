@@ -41,7 +41,6 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
           passwordHash,
           role: Role.ADMIN,
           emailVerified: true,
-          approvedByAdmin: true,
           profileImageUrl: null,
         }),
       );

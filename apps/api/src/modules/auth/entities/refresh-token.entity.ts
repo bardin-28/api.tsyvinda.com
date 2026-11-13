@@ -1,18 +1,11 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { PrimaryUuidV7Column } from '../../../db/primary-uuid-v7';
 import { User } from '../../users/entities/user.entity';
 import type { AuthSurface } from '../services/token.service';
 
 @Entity('refresh_tokens')
 export class RefreshToken {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryUuidV7Column()
   id: string;
 
   @Column({ type: 'uuid' })

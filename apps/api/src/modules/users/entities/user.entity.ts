@@ -1,16 +1,10 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, UpdateDateColumn } from 'typeorm';
+import { PrimaryUuidV7Column } from '../../../db/primary-uuid-v7';
 import { Role } from '@tsyvinda/shared-types';
 
 @Entity('users')
 export class User {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryUuidV7Column()
   id: string;
 
   @Column({ type: 'varchar', length: 50 })
@@ -31,9 +25,6 @@ export class User {
 
   @Column({ type: 'boolean', default: false })
   emailVerified: boolean;
-
-  @Column({ type: 'boolean', default: false })
-  approvedByAdmin: boolean;
 
   @Column({ type: 'enum', enum: Role, enumName: 'user_role', default: Role.USER })
   role: Role;

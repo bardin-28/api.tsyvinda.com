@@ -13,9 +13,6 @@ class DashboardUserStatsDto implements DashboardUserStats {
   @ApiProperty()
   admins: number;
 
-  @ApiProperty({ description: 'Email verified, waiting for admin approval' })
-  pendingApproval: number;
-
   @ApiProperty()
   unverified: number;
 
@@ -52,9 +49,6 @@ class DashboardRecentUserDto implements DashboardRecentUser {
 
   @ApiProperty()
   emailVerified: boolean;
-
-  @ApiProperty()
-  approvedByAdmin: boolean;
 
   @ApiProperty({ format: 'date-time' })
   createdAt: string;

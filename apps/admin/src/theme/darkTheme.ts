@@ -2,17 +2,18 @@ import { deepMerge } from './deepMerge';
 import { defaultDarkTheme, type RaThemeOptions } from 'react-admin';
 import { baseTheme } from './base';
 import { buildComponents } from './components';
-import { brand, neutral, semantic } from './tokens';
+import { brand, brandTint, neutral, semantic } from './tokens';
 
 export const darkTheme: RaThemeOptions = deepMerge(deepMerge(defaultDarkTheme, baseTheme), {
   palette: {
     mode: 'dark',
-    // Brand steps up to 400 on dark ground: 700 fails contrast there.
+    // The website orange itself reads at 6.05:1 on the navy paper, so dark uses it as-is.
     primary: {
       light: brand[300],
-      main: brand[400],
-      dark: brand[600],
-      contrastText: neutral[950],
+      main: brand[500],
+      dark: brand[400],
+      // Text on orange fills is always white (buttons, chips, badges)
+      contrastText: '#FFFFFF',
     },
     secondary: {
       light: neutral[300],
@@ -30,7 +31,8 @@ export const darkTheme: RaThemeOptions = deepMerge(deepMerge(defaultDarkTheme, b
       light: semantic.warning.light,
       main: semantic.warning.light,
       dark: semantic.warning.main,
-      contrastText: neutral[950],
+      // Amber/orange fill (e.g. warning notifications): white text, like primary
+      contrastText: '#FFFFFF',
     },
     error: {
       light: semantic.error.light,
@@ -51,7 +53,7 @@ export const darkTheme: RaThemeOptions = deepMerge(deepMerge(defaultDarkTheme, b
       disabled: neutral[600],
     },
     divider: neutral[800],
-    bulkActionsToolbarBackgroundColor: 'rgba(139, 133, 255, 0.12)',
+    bulkActionsToolbarBackgroundColor: brandTint(0.12),
   },
   components: buildComponents('dark'),
 } satisfies RaThemeOptions);

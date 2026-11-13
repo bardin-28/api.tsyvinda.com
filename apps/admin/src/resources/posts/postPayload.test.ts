@@ -1,42 +1,104 @@
 import { describe, it, expect } from 'vitest';
-import { toPostPayload } from './postPayload';
-import { slugify } from './slugify';
+import { toPostPayload, type PostFormValues } from './postPayload';
 
-const base = { title: 'Hello', slug: 'hello', description: 'Sum', htmlContent: '<p>Hi</p>' };
+const base: PostFormValues = {
+  title: 'Hello',
+  slug: 'hello',
+  description: 'Lead',
+  htmlContent: '<p>Hi</p>',
+};
+const none = { imageUrl: null, ogImageUrl: null };
+const file = new File(['x'], 'a.png', { type: 'image/png' });
 
 describe('toPostPayload', () => {
-  it('keeps an unchanged cover out of the body', () => {
-    expect(
-      toPostPayload({ ...base, imageUrl: 'https://cdn/x.png' }, { imageUrl: 'https://cdn/x.png' }),
-    ).toEqual(base);
-  });
-
-  it('sends a newly picked file as image', () => {
-    const picked = { rawFile: new File(['x'], 'c.png', { type: 'image/png' }), src: 'blob:x' };
-    expect(toPostPayload({ ...base, imageUrl: picked }).image).toBe(picked);
-  });
-
-  it('flags removeImage when the existing cover was cleared', () => {
-    expect(toPostPayload({ ...base, imageUrl: null }, { imageUrl: 'https://cdn/x.png' })).toEqual({
-      ...base,
-      removeImage: true,
+  it('sends content, empty overrides as "" and a draft by default', () => {
+    expect(toPostPayload(base, none)).toEqual({
+      title: 'Hello',
+      slug: 'hello',
+      description: 'Lead',
+      htmlContent: '<p>Hi</p>',
+      coverAlt: '',
+      categoryIds: [],
+      status: 'draft',
+      publishedAt: '',
+      seoTitle: '',
+      seoDescription: '',
+      canonicalUrl: '',
     });
   });
 
-  it('sends a cleared description as an empty string', () => {
-    expect(toPostPayload({ ...base, description: null }).description).toBe('');
+  it('sends publishing, author, ordered categories and SEO fields', () => {
+    const payload = toPostPayload(
+      {
+        ...base,
+        status: 'published',
+        publishedAt: new Date('2026-08-07T10:00:00.000Z'),
+        authorId: 'u1',
+        categoryIds: ['c2', 'c1'],
+        seoTitle: 'SEO',
+        canonicalUrl: 'https://example.com/a',
+        coverAlt: 'Knot',
+      },
+      none,
+    );
+    expect(payload).toMatchObject({
+      status: 'published',
+      publishedAt: '2026-08-07T10:00:00.000Z',
+      authorId: 'u1',
+      categoryIds: ['c2', 'c1'],
+      seoTitle: 'SEO',
+      canonicalUrl: 'https://example.com/a',
+      coverAlt: 'Knot',
+    });
   });
 
-  it('never forwards read-only fields', () => {
-    const payload = toPostPayload({ ...base, author: { id: 'u1' }, createdAt: 'x' } as never);
-    expect(payload).not.toHaveProperty('author');
-    expect(payload).not.toHaveProperty('createdAt');
+  it('leaves the author out when empty (API defaults to the signed-in admin)', () => {
+    expect(toPostPayload({ ...base, authorId: null }, none)).not.toHaveProperty('authorId');
   });
-});
 
-describe('slugify', () => {
-  it('produces an API-valid slug', () => {
-    expect(slugify('  Héllo, Wörld!  Part 2 ')).toBe('hello-world-part-2');
-    expect(slugify('---')).toBe('');
+  it('sends newly picked cover and social images as files', () => {
+    const payload = toPostPayload(
+      { ...base, imageUrl: { rawFile: file }, ogImageUrl: { rawFile: file } },
+      none,
+    );
+    expect(payload.image).toEqual({ rawFile: file });
+    expect(payload.ogImage).toEqual({ rawFile: file });
+  });
+
+  it('uses the cover as OG image when ticked: no upload, stored OG image dropped', () => {
+    const previous = { imageUrl: 'https://cdn/a.png', ogImageUrl: 'https://cdn/og.png' };
+    const payload = toPostPayload(
+      { ...base, ogImageUrl: { rawFile: file }, useCoverAsOgImage: true },
+      previous,
+    );
+    expect(payload).not.toHaveProperty('ogImage');
+    expect(payload).toMatchObject({ removeOgImage: true });
+    expect(toPostPayload({ ...base, useCoverAsOgImage: true }, none)).not.toHaveProperty(
+      'removeOgImage',
+    );
+  });
+
+  it('uploads a dedicated OG image when unticked', () => {
+    const payload = toPostPayload(
+      { ...base, ogImageUrl: { rawFile: file }, useCoverAsOgImage: false },
+      none,
+    );
+    expect(payload.ogImage).toEqual({ rawFile: file });
+  });
+
+  it('asks to remove images that were cleared, keeps unchanged ones', () => {
+    const previous = { imageUrl: 'https://cdn/a.png', ogImageUrl: 'https://cdn/og.png' };
+    expect(
+      toPostPayload({ ...base, imageUrl: null, ogImageUrl: 'https://cdn/og.png' }, previous),
+    ).toMatchObject({ removeImage: true });
+    expect(
+      toPostPayload({ ...base, imageUrl: 'https://cdn/a.png', ogImageUrl: null }, previous),
+    ).toMatchObject({ removeOgImage: true });
+    const unchanged = toPostPayload(
+      { ...base, imageUrl: 'https://cdn/a.png', ogImageUrl: 'https://cdn/og.png' },
+      previous,
+    );
+    expect(unchanged).not.toHaveProperty('removeImage');
+    expect(unchanged).not.toHaveProperty('image');
   });
 });

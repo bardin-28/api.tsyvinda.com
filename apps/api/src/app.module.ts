@@ -11,6 +11,8 @@ import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { PostsModule } from './modules/posts/posts.module';
+import { SiteSettingsModule } from './modules/site-settings/site-settings.module';
+import { CmsModule } from './modules/cms/cms.module';
 import { AdminApiModule } from './admin/admin-api.module';
 
 @Module({
@@ -33,6 +35,8 @@ import { AdminApiModule } from './admin/admin-api.module';
     AuthModule,
     UsersModule,
     PostsModule,
+    SiteSettingsModule,
+    CmsModule,
     AdminApiModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

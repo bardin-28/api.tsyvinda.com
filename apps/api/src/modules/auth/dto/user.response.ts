@@ -23,9 +23,6 @@ export class UserDto {
   @ApiProperty()
   emailVerified: boolean;
 
-  @ApiProperty()
-  approvedByAdmin: boolean;
-
   @ApiProperty({ format: 'date-time' })
   createdAt: Date;
 }

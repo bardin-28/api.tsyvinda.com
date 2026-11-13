@@ -13,7 +13,6 @@ const stats = {
   users: {
     total: 1,
     admins: 1,
-    pendingApproval: 0,
     unverified: 0,
     newLast7Days: 1,
     newLast30Days: 1,

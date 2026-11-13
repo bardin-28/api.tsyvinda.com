@@ -1,8 +1,6 @@
 export interface DashboardUserStats {
   total: number;
   admins: number;
-  /** Email verified, still waiting for admin approval */
-  pendingApproval: number;
   unverified: number;
   newLast7Days: number;
   newLast30Days: number;
@@ -20,7 +18,6 @@ export interface DashboardRecentUser {
   lastName: string;
   email: string;
   emailVerified: boolean;
-  approvedByAdmin: boolean;
   createdAt: string;
 }
 

@@ -27,11 +27,15 @@ WORKDIR /repo
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm turbo run build --filter=@tsyvinda/admin
+# CSP connect-src must allow the API origin the bundle calls (baked in above).
+RUN API_ORIGIN=$(node -e "const u=process.env.ADMIN_PUBLIC_API_URL; console.log(u ? new URL(u).origin : '')") \
+    && sed "s|__ADMIN_API_ORIGIN__|${API_ORIGIN}|" apps/admin/security-headers.conf > /tmp/security-headers.conf
 
 # Unprivileged variant: nginx runs as uid 101 on :8080 and writes only to /tmp, so the
 # pod runs non-root with a read-only root filesystem (infra helm/admin).
 FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
 COPY apps/admin/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /tmp/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /repo/apps/admin/dist /usr/share/nginx/html
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=10s \

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const emptyToUndefined = (value: unknown) => (value === '' ? undefined : value);
+
 const envSchema = z
   .object({
     PORT: z.coerce.number().int().positive().default(3000),
@@ -73,6 +75,11 @@ const envSchema = z
       .string()
       .default('false')
       .transform((v) => v === 'true'),
+    // Website cache webhook: after a CMS change the API POSTs the changed cache tags here
+    // (e.g. https://tsyvinda.com/api/revalidate). Unset = website pages just expire on their own.
+    // Compose passes unset variables as "" — treat that as unset
+    WEBSITE_REVALIDATE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+    WEBSITE_REVALIDATE_SECRET: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
   })
   .superRefine((e, ctx) => {
     // Cloudflare Turnstile is mandatory in production: a missing secret there means
@@ -94,6 +101,13 @@ const envSchema = z
         code: 'custom',
         path: ['ADMIN_DEFAULT_PASSWORD'],
         message: 'ADMIN_DEFAULT_EMAIL and ADMIN_DEFAULT_PASSWORD must be set together',
+      });
+    }
+    if (!e.WEBSITE_REVALIDATE_URL !== !e.WEBSITE_REVALIDATE_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['WEBSITE_REVALIDATE_SECRET'],
+        message: 'WEBSITE_REVALIDATE_URL and WEBSITE_REVALIDATE_SECRET must be set together',
       });
     }
     if (e.NODE_ENV === 'production' && !e.SMTP_HOST) {
@@ -163,6 +177,10 @@ function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       secretAccessKey: e.S3_SECRET_ACCESS_KEY,
       publicUrl: e.S3_PUBLIC_URL,
       forcePathStyle: e.S3_FORCE_PATH_STYLE,
+    },
+    website: {
+      revalidateUrl: e.WEBSITE_REVALIDATE_URL,
+      revalidateSecret: e.WEBSITE_REVALIDATE_SECRET,
     },
   };
 }

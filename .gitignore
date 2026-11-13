@@ -27,3 +27,7 @@ uploads
 .turbo
 .pnpm-store/
 *.tsbuildinfo
+
+# Local working docs (plans, reports, articles): kept on disk, not in git
+docs/
+.vitest/

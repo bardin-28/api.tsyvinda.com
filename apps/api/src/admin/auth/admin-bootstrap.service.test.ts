@@ -37,7 +37,7 @@ describe('AdminBootstrapService.ensureDefaultAdmin', () => {
     expect(users.findOne).not.toHaveBeenCalled();
   });
 
-  it('creates a verified, approved ADMIN with a hashed password and a local identity', async () => {
+  it('creates a verified ADMIN with a hashed password and a local identity', async () => {
     await service.ensureDefaultAdmin('admin@example.com', 'long-enough-password');
 
     const created = users.save.mock.calls[0]?.[0] as User;
@@ -45,7 +45,6 @@ describe('AdminBootstrapService.ensureDefaultAdmin', () => {
       email: 'admin@example.com',
       role: Role.ADMIN,
       emailVerified: true,
-      approvedByAdmin: true,
     });
     expect(created.passwordHash).not.toBe('long-enough-password');
     await expect(verifyPassword('long-enough-password', created.passwordHash!)).resolves.toBe(true);

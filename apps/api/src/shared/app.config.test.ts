@@ -113,4 +113,23 @@ describe('loadConfig', () => {
       }),
     ).toThrow(/ADMIN_DEFAULT_PASSWORD/);
   });
+
+  it('reads the website revalidation webhook, empty meaning unset, both or neither', () => {
+    expect(
+      loadConfig({ ...baseEnv, WEBSITE_REVALIDATE_URL: '', WEBSITE_REVALIDATE_SECRET: '' }).website,
+    ).toEqual({
+      revalidateUrl: undefined,
+      revalidateSecret: undefined,
+    });
+    expect(
+      loadConfig({
+        ...baseEnv,
+        WEBSITE_REVALIDATE_URL: 'https://tsyvinda.com/api/revalidate',
+        WEBSITE_REVALIDATE_SECRET: 's'.repeat(32),
+      }).website.revalidateUrl,
+    ).toBe('https://tsyvinda.com/api/revalidate');
+    expect(() =>
+      loadConfig({ ...baseEnv, WEBSITE_REVALIDATE_URL: 'https://tsyvinda.com/api/revalidate' }),
+    ).toThrow(/WEBSITE_REVALIDATE/);
+  });
 });

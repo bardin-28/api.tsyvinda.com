@@ -12,11 +12,26 @@ import type {
   UpdateManyParams,
   UpdateParams,
 } from 'react-admin';
-import type { DashboardStats, ListResponse } from '@tsyvinda/shared-types';
+import type {
+  AdminPage,
+  DashboardStats,
+  ListResponse,
+  Locale,
+  SiteSettings,
+  SiteSettingsUpdate,
+} from '@tsyvinda/shared-types';
 import { apiClient, toHttpError } from '../services/apiClient';
 
 export interface AdminDataProvider extends DataProvider {
   getDashboard(): Promise<DashboardStats>;
+  getSiteSettings(): Promise<SiteSettings>;
+  saveSiteSettings(update: SiteSettingsUpdate): Promise<SiteSettings>;
+  /** Deletes one language version of a post (the API refuses the last one). */
+  deletePostTranslation(postId: Identifier, locale: Locale): Promise<void>;
+  /** CMS page: URL segment per language; live at once, old ones redirect. */
+  updatePageSlugs(key: Identifier, slugs: Partial<Record<Locale, string>>): Promise<AdminPage>;
+  /** CMS page: uploads an image for an image field (stored at once), returns its public URL. */
+  uploadPageImage(file: File): Promise<{ url: string }>;
 }
 
 async function call<T>(request: () => Promise<{ data: T }>): Promise<T> {
@@ -136,5 +151,27 @@ export const dataProvider = {
 
   getDashboard() {
     return call(() => apiClient.get<DashboardStats>('/dashboard'));
+  },
+
+  getSiteSettings() {
+    return call(() => apiClient.get<SiteSettings>('/settings'));
+  },
+
+  saveSiteSettings(update: SiteSettingsUpdate) {
+    return call(() => apiClient.patch<SiteSettings>('/settings', update));
+  },
+
+  async deletePostTranslation(postId: Identifier, locale: Locale) {
+    await call(() => apiClient.delete(`/posts/${postId}/translations/${locale}`));
+  },
+
+  updatePageSlugs(key: Identifier, slugs: Partial<Record<Locale, string>>) {
+    return call(() => apiClient.put<AdminPage>(`/pages/${key}/slugs`, { slugs }));
+  },
+
+  uploadPageImage(file: File) {
+    const body = new FormData();
+    body.append('image', file);
+    return call(() => apiClient.post<{ url: string }>('/pages/uploads', body));
   },
 } as AdminDataProvider;

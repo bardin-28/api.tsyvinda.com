@@ -4,7 +4,8 @@ export interface ApiErrorBody {
     code: string;
     message: string;
     details?: {
-      fieldErrors?: Record<string, string[] | undefined>;
+      /** Per field: messages (DTO validation) or one message (CMS content paths) */
+      fieldErrors?: Record<string, string | string[] | undefined>;
       [key: string]: unknown;
     };
     requestId?: string;

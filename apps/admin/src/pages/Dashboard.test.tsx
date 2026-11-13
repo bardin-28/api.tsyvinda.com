@@ -10,7 +10,6 @@ const stats: DashboardStats = {
   users: {
     total: 42,
     admins: 2,
-    pendingApproval: 5,
     unverified: 7,
     newLast7Days: 3,
     newLast30Days: 11,
@@ -23,7 +22,6 @@ const stats: DashboardStats = {
       lastName: 'Hopper',
       email: 'grace@example.com',
       emailVerified: true,
-      approvedByAdmin: false,
       createdAt: '2026-10-23T08:00:00.000Z',
     },
     {
@@ -32,7 +30,6 @@ const stats: DashboardStats = {
       lastName: 'Turing',
       email: 'alan@example.com',
       emailVerified: false,
-      approvedByAdmin: false,
       createdAt: '2026-10-22T08:00:00.000Z',
     },
   ],
@@ -64,24 +61,22 @@ describe('Dashboard', () => {
     renderDashboard(vi.fn().mockResolvedValue(stats));
 
     expect(await screen.findByText('Welcome, Ada Admin')).toBeInTheDocument();
-    const pending = (await screen.findByText('Pending approval', { selector: 'p' })).closest(
-      '.MuiCard-root',
-    ) as HTMLElement;
-    expect(within(pending).getByText('5')).toBeInTheDocument();
+    // Admin approval was removed: no "Pending approval" KPI
+    expect(screen.queryByText('Pending approval')).not.toBeInTheDocument();
     const users = screen
       .getByText('Users', { selector: 'p' })
       .closest('.MuiCard-root') as HTMLElement;
     expect(within(users).getByText('42')).toBeInTheDocument();
   });
 
-  it('lists the latest signups with their status', async () => {
+  it('lists the latest signups without an account status', async () => {
     renderDashboard(vi.fn().mockResolvedValue(stats));
 
     const table = await screen.findByRole('table', { name: /latest signups/i });
-    const grace = within(table).getByText('grace@example.com').closest('tr') as HTMLElement;
-    expect(within(grace).getByText('Pending approval')).toBeInTheDocument();
-    const alan = within(table).getByText('alan@example.com').closest('tr') as HTMLElement;
-    expect(within(alan).getByText('Unverified')).toBeInTheDocument();
+    expect(within(table).getByText('grace@example.com')).toBeInTheDocument();
+    expect(within(table).getByText('alan@example.com')).toBeInTheDocument();
+    expect(within(table).queryByText('Status')).not.toBeInTheDocument();
+    expect(within(table).queryByText(/verified/i)).not.toBeInTheDocument();
   });
 
   it('shows an error when the stats cannot be loaded', async () => {

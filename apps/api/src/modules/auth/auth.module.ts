@@ -9,7 +9,6 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './services/auth.service';
 import { EmailService } from './services/email.service';
 import { AuthGuard } from './guards/auth.guard';
-import { ApprovedGuard } from './guards/approved.guard';
 
 @Module({
   imports: [
@@ -22,9 +21,8 @@ import { ApprovedGuard } from './guards/approved.guard';
     // is built explicitly here.
     { provide: EmailService, useFactory: () => new EmailService() },
     AuthGuard,
-    ApprovedGuard,
   ],
-  // Guards are consumed by the posts/users modules; AuthService by the admin auth module.
-  exports: [AuthService, AuthGuard, ApprovedGuard],
+  // AuthGuard is consumed by the users module; AuthService by the admin auth module.
+  exports: [AuthService, AuthGuard],
 })
 export class AuthModule {}

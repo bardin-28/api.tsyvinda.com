@@ -1,6 +1,8 @@
 import { HttpError } from 'react-admin';
 import type { ApiErrorBody } from '@tsyvinda/shared-types';
+import { CONTENT_LOCALE_HEADER } from '@tsyvinda/shared-types';
 import { clearSession } from '../auth/sessionStore';
+import { getContentLocale } from '../lib/contentLocale';
 
 export const AUTH_LOGIN_PATH = '/auth/login';
 export const AUTH_REFRESH_PATH = '/auth/refresh';
@@ -65,12 +67,14 @@ async function send<T>(
   body: unknown,
   options: RequestOptions | undefined,
 ): Promise<ApiResponse<T>> {
-  const init: RequestInit = { method, credentials: 'include' };
+  // Every call carries the content language; endpoints without translated fields ignore it.
+  const headers: Record<string, string> = { [CONTENT_LOCALE_HEADER]: getContentLocale() };
+  const init: RequestInit = { method, credentials: 'include', headers };
   if (body instanceof FormData) {
     init.body = body;
   } else if (body !== undefined) {
     init.body = JSON.stringify(body);
-    init.headers = { 'Content-Type': 'application/json' };
+    headers['Content-Type'] = 'application/json';
   }
 
   let res: Response;
@@ -136,6 +140,8 @@ export const apiClient = {
     request<T>('POST', path, body, options),
   patch: <T = unknown>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>('PATCH', path, body, options),
+  put: <T = unknown>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PUT', path, body, options),
   delete: <T = unknown>(path: string, options?: RequestOptions) =>
     request<T>('DELETE', path, undefined, options),
 };
@@ -145,14 +151,15 @@ export function extractErrorStatus(error: unknown): number | undefined {
   return typeof status === 'number' ? status : undefined;
 }
 
-// VALIDATION_FAILED carries `details.fieldErrors: { field: [messages] }`; RA wants one message per field.
+// VALIDATION_FAILED carries `details.fieldErrors: { field: [messages] }` (DTO validation) or
+// `{ "blocks.0.data.title.en": message }` (CMS content); RA wants one message per field.
 function toFieldErrors(
-  fieldErrors: Record<string, string[] | undefined> | undefined,
+  fieldErrors: Record<string, string | string[] | undefined> | undefined,
 ): Record<string, string> | undefined {
   if (!fieldErrors) return undefined;
   const out: Record<string, string> = {};
   for (const [field, messages] of Object.entries(fieldErrors)) {
-    const first = messages?.[0];
+    const first = Array.isArray(messages) ? messages[0] : messages;
     if (first) out[field] = first;
   }
   return Object.keys(out).length ? out : undefined;
