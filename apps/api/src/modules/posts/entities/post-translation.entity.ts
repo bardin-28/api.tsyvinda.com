@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryColumn,
@@ -15,6 +16,11 @@ import { Post } from './post.entity';
  * cover, SEO and share image). A post is shown in a language only when it has this row.
  */
 @Entity('post_translations')
+// A language's own URL segment is unique within that language
+@Index('post_translations_locale_slug_uniq', ['locale', 'slug'], {
+  unique: true,
+  where: '"slug" IS NOT NULL',
+})
 export class PostTranslation {
   @PrimaryColumn({ type: 'uuid' })
   postId: string;
@@ -24,6 +30,14 @@ export class PostTranslation {
 
   @Column({ type: 'varchar', length: 200 })
   title: string;
+
+  /** This language's URL segment (e.g. transliterated title); null = the post's shared slug */
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  slug: string | null;
+
+  /** Search keywords of this language version */
+  @Column({ type: 'text', array: true, default: () => "'{}'" })
+  keywords: string[];
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   description: string | null;

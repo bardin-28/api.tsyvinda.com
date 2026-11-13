@@ -9,7 +9,16 @@ import {
   useRecordContext,
 } from 'react-admin';
 import { useFormContext, useWatch } from 'react-hook-form';
-import { Box, Checkbox, FormControlLabel, Tab, Tabs, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  Stack,
+  Tab,
+  Tabs,
+  Typography,
+} from '@mui/material';
 import { HtmlEditorInput } from '../../components/HtmlEditorInput';
 import { DetailLayout } from '../../components/DetailLayout';
 import { SingleImageInput } from '../../components/SingleImageInput';
@@ -77,18 +86,55 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   </Typography>
 );
 
-/** Live public path under the slug field. */
+/** Live public path of this language: its own URL segment, else the shared one. */
 const SlugPreview: React.FC = () => {
   const slug = useWatch({ name: 'slug' }) as string | undefined;
+  const localizedSlug = useWatch({ name: 'localizedSlug' }) as string | null | undefined;
   const locale = useContentLocale();
   // English is unprefixed on the website, other languages live under /<locale>
   const prefix = locale === DEFAULT_LOCALE ? '' : `/${locale}`;
   return (
     <Typography variant="caption" sx={{ color: 'text.secondary', px: 1.75, mt: -0.5 }}>
-      {prefix}/blog/{slug || '…'}
+      {prefix}/blog/{localizedSlug || slug || '…'}
     </Typography>
   );
 };
+
+/** This language's own URL segment, with a button that transliterates the title into it. */
+const LocalizedSlugInput: React.FC = () => {
+  const { setValue } = useFormContext();
+  const title = useWatch({ name: 'title' }) as string | undefined;
+  const slug = useWatch({ name: 'slug' }) as string | undefined;
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+      <TextInput
+        source="localizedSlug"
+        label="URL in this language"
+        validate={[maxLength(200), slugFormat]}
+        helperText={`Empty: the shared URL (${slug || '…'}). Old addresses redirect here.`}
+        sx={{ flex: 1 }}
+      />
+      <Button
+        variant="outlined"
+        size="small"
+        disabled={!title}
+        onClick={() =>
+          setValue('localizedSlug', slugify(title ?? ''), {
+            shouldDirty: true,
+            shouldValidate: true,
+          })
+        }
+        sx={{ mt: 1.25, whiteSpace: 'nowrap' }}
+      >
+        From title
+      </Button>
+    </Stack>
+  );
+};
+
+/** Stored as a list, edited as one comma-separated line. */
+const formatKeywords = (value: unknown): string =>
+  Array.isArray(value) ? value.join(', ') : typeof value === 'string' ? value : '';
 
 const ContentTab: React.FC = () => (
   <>
@@ -176,8 +222,9 @@ const SeoTab: React.FC = () => (
       source="slug"
       label="URL"
       validate={[required(), maxLength(200), slugFormat]}
-      helperText="Shared by all languages"
+      helperText="Shared key of the post; languages without their own URL use it"
     />
+    <LocalizedSlugInput />
     <SlugPreview />
 
     <SectionLabel>Search engines</SectionLabel>
@@ -194,6 +241,13 @@ const SeoTab: React.FC = () => (
       minRows={2}
       validate={maxLength(500)}
       helperText="Empty: the lead"
+    />
+    <TextInput
+      source="keywords"
+      label="Keywords"
+      format={formatKeywords}
+      parse={(value: string) => value}
+      helperText="Comma-separated, in this language (e.g. Next.js, security, API proxy)"
     />
     <TextInput
       source="canonicalUrl"

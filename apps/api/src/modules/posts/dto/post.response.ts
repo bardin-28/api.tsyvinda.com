@@ -43,8 +43,22 @@ export class PostDto {
   @ApiProperty()
   title: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Shared key of the post (its English URL segment)' })
   slug: string;
+
+  @ApiProperty({
+    nullable: true,
+    description: "This language's own URL segment; null = the shared slug",
+  })
+  localizedSlug: string | null;
+
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'URL segment per language the post exists in, e.g. { en: "my-post", uk: "miy-post" }',
+  })
+  slugs: Partial<Record<Locale, string>>;
 
   @ApiProperty({ required: false, nullable: true })
   description: string | null;
@@ -75,6 +89,9 @@ export class PostDto {
 
   @ApiProperty({ required: false, nullable: true, description: 'Empty: the description' })
   seoDescription: string | null;
+
+  @ApiProperty({ type: [String], description: 'Search keywords of this language version' })
+  keywords: string[];
 
   @ApiProperty({ required: false, nullable: true, description: 'Empty: the cover image' })
   ogImageUrl: string | null;

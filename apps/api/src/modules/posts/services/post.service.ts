@@ -25,7 +25,12 @@ export interface PublicPost {
   locale: Locale;
   locales: Locale[];
   title: string;
+  /** Shared key (English URL segment) */
   slug: string;
+  /** This language's own URL segment; null = `slug` */
+  localizedSlug: string | null;
+  /** URL segment per language the post exists in */
+  slugs: Partial<Record<Locale, string>>;
   description: string | null;
   htmlContent: string;
   imageUrl: string | null;
@@ -36,6 +41,7 @@ export interface PublicPost {
   publishedAt: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
+  keywords: string[];
   ogImageUrl: string | null;
   canonicalUrl: string | null;
   createdAt: string;
@@ -106,33 +112,53 @@ export function toPublicAuthor(user: User): PublicAuthor {
 export type PostTranslationFields = Pick<
   PostTranslation,
   | 'title'
+  | 'slug'
   | 'description'
   | 'htmlContent'
   | 'imageUrl'
   | 'coverAlt'
   | 'seoTitle'
   | 'seoDescription'
+  | 'keywords'
   | 'ogImageUrl'
   | 'canonicalUrl'
 >;
 
 export const EMPTY_TRANSLATION: PostTranslationFields = {
   title: '',
+  slug: null,
   description: null,
   htmlContent: '',
   imageUrl: null,
   coverAlt: null,
   seoTitle: null,
   seoDescription: null,
+  keywords: [],
   ogImageUrl: null,
   canonicalUrl: null,
 };
 
+/** One existing language version of a post: its language and own URL segment (null = shared). */
+export interface PostVersion {
+  locale: Locale;
+  slug: string | null;
+}
+
 export interface PostLocaleView {
   locale: Locale;
-  /** Languages the post is translated into */
-  locales: Locale[];
+  /** Language versions the post has */
+  versions: PostVersion[];
   translation: PostTranslationFields;
+}
+
+/** URL segment of every language version: its own one, else the post's shared slug. */
+export function versionSlugs(
+  sharedSlug: string,
+  versions: PostVersion[],
+): Partial<Record<Locale, string>> {
+  const slugs: Partial<Record<Locale, string>> = {};
+  for (const version of versions) slugs[version.locale] = version.slug ?? sharedSlug;
+  return slugs;
 }
 
 export function toPublicPost(
@@ -145,9 +171,11 @@ export function toPublicPost(
   return {
     id: post.id,
     locale: view.locale,
-    locales: view.locales,
+    locales: view.versions.map((version) => version.locale),
     title: translation.title,
     slug: post.slug,
+    localizedSlug: translation.slug,
+    slugs: versionSlugs(post.slug, view.versions),
     description: translation.description,
     htmlContent: translation.htmlContent,
     imageUrl: translation.imageUrl,
@@ -158,6 +186,7 @@ export function toPublicPost(
     publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
     seoTitle: translation.seoTitle,
     seoDescription: translation.seoDescription,
+    keywords: translation.keywords,
     ogImageUrl: translation.ogImageUrl,
     canonicalUrl: translation.canonicalUrl,
     createdAt: post.createdAt.toISOString(),
@@ -197,23 +226,23 @@ export async function loadPostCategories(
   return byPost;
 }
 
-/** Languages each post is translated into (sorted, English first), keyed by post id. */
-export async function loadPostLocales(
+/** Language versions of each post (sorted, English first) with their URL segments, by post id. */
+export async function loadPostVersions(
   manager: EntityManager,
   postIds: string[],
-): Promise<Map<string, Locale[]>> {
-  const byPost = new Map<string, Locale[]>();
+): Promise<Map<string, PostVersion[]>> {
+  const byPost = new Map<string, PostVersion[]>();
   if (postIds.length === 0) return byPost;
   const rows = await manager
     .getRepository(PostTranslation)
     .createQueryBuilder('translation')
-    .select(['translation.postId', 'translation.locale'])
+    .select(['translation.postId', 'translation.locale', 'translation.slug'])
     .where('translation.postId IN (:...postIds)', { postIds })
     .orderBy('translation.locale', 'ASC')
     .getMany();
   for (const row of rows) {
     const list = byPost.get(row.postId) ?? [];
-    list.push(row.locale);
+    list.push({ locale: row.locale, slug: row.slug });
     byPost.set(row.postId, list);
   }
   return byPost;
@@ -248,15 +277,19 @@ export class PostService {
 
   private async toPublicPosts(rows: PostWithTranslation[], locale: Locale): Promise<PublicPost[]> {
     const postIds = rows.map((post) => post.id);
-    const [categories, locales] = await Promise.all([
+    const [categories, versions] = await Promise.all([
       loadPostCategories(this.ds.manager, postIds, locale),
-      loadPostLocales(this.ds.manager, postIds),
+      loadPostVersions(this.ds.manager, postIds),
     ]);
     return rows.map((post) =>
       toPublicPost(
         post,
         post.author,
-        { locale, locales: locales.get(post.id) ?? [locale], translation: post.translation },
+        {
+          locale,
+          versions: versions.get(post.id) ?? [{ locale, slug: post.translation.slug }],
+          translation: post.translation,
+        },
         categories.get(post.id) ?? [],
       ),
     );
@@ -296,9 +329,10 @@ export class PostService {
     };
   }
 
+  /** By the shared slug or this language's own one. */
   async getBySlug(slug: string, locale: Locale): Promise<PublicPost> {
     const post = (await this.publishedIn(locale)
-      .andWhere('post.slug = :slug', { slug })
+      .andWhere('(post.slug = :slug OR translation.slug = :slug)', { slug })
       .getOne()) as PostWithTranslation | null;
     if (!post) {
       throw new HttpError(404, 'POST_NOT_FOUND', 'Post not found');

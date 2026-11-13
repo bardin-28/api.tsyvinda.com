@@ -17,6 +17,7 @@ import { HttpError } from '../../../shared/http-error';
 import { Page } from '../entities/page.entity';
 import { PageSlug } from '../entities/page-slug.entity';
 import { Redirect } from '../entities/redirect.entity';
+import { versionSlugs } from '../../posts/services/post.service';
 import {
   RouteIndex,
   normalizeRequestPath,
@@ -112,41 +113,64 @@ export class RoutesService {
       return { kind: 'redirect', location: localizePath(current, locale), permanent: true };
     }
 
-    // "<blog path>/<post slug>"
+    // "<blog path>/<post slug>": the shared slug or any language's own one finds the post; a
+    // segment other than this language's current one redirects there
     if (matched.key === BLOG_PAGE_KEY && matched.consumed === segments.length - 1) {
-      const slug = segments[segments.length - 1]!;
-      const postLocales = await this.publishedPostLocales(slug);
+      const segment = segments[segments.length - 1]!;
+      const post = await this.publishedPostBySegment(segment);
       const blogPath = index.path(BLOG_PAGE_KEY, locale);
-      if (!postLocales.includes(locale) || blogPath === null) throw notFound();
-      const postPath = `${blogPath}/${slug}`;
+      const ownSlug = post?.slugs[locale];
+      if (!post || !ownSlug || blogPath === null) throw notFound();
+      const postPath = `${blogPath}/${ownSlug}`;
       if (postPath !== path) {
         return { kind: 'redirect', location: localizePath(postPath, locale), permanent: true };
       }
-      return { kind: 'post', slug, paths: this.postPaths(index, slug, postLocales) };
+      return { kind: 'post', slug: post.key, paths: this.postPaths(index, post.slugs) };
     }
 
     throw notFound();
   }
 
-  /** Paths of a blog post in the languages it is published in. */
-  postPaths(index: RouteIndex, slug: string, locales: Locale[]): LocalizedPaths {
+  /** Paths of a blog post in the languages it is published in (each with its own segment). */
+  postPaths(index: RouteIndex, slugs: Partial<Record<Locale, string>>): LocalizedPaths {
     const paths: LocalizedPaths = {};
-    for (const locale of locales) {
+    for (const [locale, slug] of Object.entries(slugs) as [Locale, string][]) {
       const blogPath = index.path(BLOG_PAGE_KEY, locale);
       if (blogPath !== null) paths[locale] = `${blogPath}/${slug}`;
     }
     return paths;
   }
 
-  private async publishedPostLocales(slug: string): Promise<Locale[]> {
-    const rows: { locale: Locale }[] = await this.ds.query(
-      `SELECT translation.locale
+  /**
+   * The published post that owns `segment` (as its shared slug or a language's own slug): its
+   * shared slug (`key`) and the segment of every language version.
+   */
+  private async publishedPostBySegment(
+    segment: string,
+  ): Promise<{ key: string; slugs: Partial<Record<Locale, string>> } | null> {
+    const rows: { key: string; locale: Locale; slug: string | null }[] = await this.ds.query(
+      `SELECT post.slug AS key, translation.locale, translation.slug
        FROM posts post
        JOIN post_translations translation ON translation."postId" = post.id
-       WHERE post.slug = $1 AND post.status = 'published'`,
-      [slug],
+       WHERE post.status = 'published'
+         AND post.id = (
+           SELECT owner.id FROM posts owner
+           WHERE owner.slug = $1
+              OR EXISTS (SELECT 1 FROM post_translations own
+                         WHERE own."postId" = owner.id AND own.slug = $1)
+           LIMIT 1
+         )`,
+      [segment],
     );
-    return rows.map((row) => row.locale);
+    const [first] = rows;
+    if (!first) return null;
+    return {
+      key: first.key,
+      slugs: versionSlugs(
+        first.key,
+        rows.map((row) => ({ locale: row.locale, slug: row.slug })),
+      ),
+    };
   }
 
   /**

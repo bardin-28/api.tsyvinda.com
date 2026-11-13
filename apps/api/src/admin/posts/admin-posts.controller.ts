@@ -70,6 +70,8 @@ function toMetaInput(dto: AdminPostMetaDto): AdminPostWriteInput {
     coverAlt: dto.coverAlt,
     seoTitle: dto.seoTitle,
     seoDescription: dto.seoDescription,
+    keywords: dto.keywords,
+    localizedSlug: dto.localizedSlug,
     canonicalUrl: dto.canonicalUrl,
   };
 }

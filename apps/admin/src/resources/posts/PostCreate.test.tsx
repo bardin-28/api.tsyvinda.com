@@ -30,7 +30,7 @@ describe('PostCreate', () => {
 
     await userEvent.type(await titleInput(), 'My First Post');
     // Slug lives on the SEO tab (mounted, just hidden)
-    expect(screen.getByLabelText(/^url/i)).toHaveValue('my-first-post');
+    expect(screen.getAllByLabelText(/^url/i)[0]).toHaveValue('my-first-post');
 
     await userEvent.click(screen.getByRole('button', { name: 'HTML source' }));
     await userEvent.type(screen.getByLabelText('Body HTML'), '<p>Hello</p>');
