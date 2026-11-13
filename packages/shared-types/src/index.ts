@@ -6,3 +6,4 @@ export * from './posts';
 export * from './users';
 export * from './site-settings';
 export * from './locales';
+export * from './content';

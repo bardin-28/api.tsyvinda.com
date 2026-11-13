@@ -2,12 +2,10 @@ import 'reflect-metadata';
 import './shared/load-env';
 import { uuidv7 } from './shared/uuid-v7';
 import type { IncomingMessage, ServerResponse } from 'http';
-import type { Request, Response, NextFunction } from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { pinoHttp } from 'pino-http';
 import { AppModule } from './app.module';
@@ -24,6 +22,7 @@ import { redis } from './redis/redis';
 import { HttpError } from './shared/http-error';
 import { AllExceptionsFilter } from './shared/all-exceptions.filter';
 import { validationExceptionFactory } from './shared/validation-exception.factory';
+import { securityHeaders } from './shared/security-headers';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -56,14 +55,8 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Swagger's inline init script needs a relaxed CSP; keep that exemption scoped
-  // to /docs and apply the strict default everywhere else.
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const mw = req.path.startsWith('/docs')
-      ? helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false })
-      : helmet();
-    mw(req, res, next);
-  });
+  // Strict JSON-API headers everywhere; Swagger (/docs*) keeps a relaxed CSP for its init script.
+  app.use(securityHeaders());
 
   app.enableCors({
     origin: (origin, cb) => {

@@ -197,13 +197,6 @@ export const buildComponents = (mode: Mode): RaThemeOptions['components'] => {
         root: { borderRadius: radius.sm, fontWeight: 600 },
         sizeSmall: { height: 22, fontSize: '0.6875rem' },
       },
-      // Filled orange chips (e.g. the Admin role) carry white text, like the brand mark
-      variants: [
-        {
-          props: { color: 'primary' as const, variant: 'filled' as const },
-          style: { color: '#FFFFFF' },
-        },
-      ],
     },
     MuiTooltip: {
       styleOverrides: {

@@ -76,3 +76,40 @@ describe('toRequestBody', () => {
     expect(toRequestBody(data)).toBe(data);
   });
 });
+
+describe('dataProvider CMS actions', () => {
+  it('uploads page images as multipart', async () => {
+    const post = vi
+      .spyOn(apiClient, 'post')
+      .mockResolvedValue({ data: { url: 'https://cdn.example/pages/a.png' } });
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    await expect(dataProvider.uploadPageImage(file)).resolves.toEqual({
+      url: 'https://cdn.example/pages/a.png',
+    });
+    const [path, body] = post.mock.calls[0]!;
+    expect(path).toBe('/pages/uploads');
+    expect((body as FormData).get('image')).toBe(file);
+  });
+
+  it('PUTs page addresses', async () => {
+    const put = vi.spyOn(apiClient, 'put').mockResolvedValue({ data: { id: 'about' } });
+    await dataProvider.updatePageSlugs('about', { uk: 'pro-mene' });
+    expect(put).toHaveBeenCalledWith('/pages/about/slugs', { slugs: { uk: 'pro-mene' } });
+  });
+
+  it('maps CMS field errors (one message per path) onto form fields', async () => {
+    vi.spyOn(apiClient, 'patch').mockRejectedValue(
+      new ApiError('fail', 400, {
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'Page content is invalid',
+          details: { fieldErrors: { 'draft.blocks.0.data.title.en': 'At most 300 characters' } },
+        },
+      }),
+    );
+    const err = (await dataProvider
+      .update('pages', { id: 'about', data: {}, previousData: { id: 'about' } })
+      .catch((e: unknown) => e)) as HttpError;
+    expect(err.body.errors).toEqual({ 'draft.blocks.0.data.title.en': 'At most 300 characters' });
+  });
+});

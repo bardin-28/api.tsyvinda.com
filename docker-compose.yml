@@ -84,6 +84,9 @@ services:
       - S3_ACCESS_KEY_ID=test
       - S3_SECRET_ACCESS_KEY=test
       - S3_FORCE_PATH_STYLE=true
+      # CMS → website cache webhook (optional; see .env.example)
+      - WEBSITE_REVALIDATE_URL=${WEBSITE_REVALIDATE_URL:-}
+      - WEBSITE_REVALIDATE_SECRET=${WEBSITE_REVALIDATE_SECRET:-}
     volumes:
       - ./apps/api/src:/repo/apps/api/src
     networks:

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { In, type DataSource, type EntityManager, type Repository } from 'typeorm';
 import {
+  BLOG_PAGE_KEY,
+  CACHE_TAGS,
   DEFAULT_LOCALE,
   type AdminPostSortField,
   type ListResponse,
@@ -11,6 +13,7 @@ import {
 } from '@tsyvinda/shared-types';
 import { HttpError } from '../../shared/http-error';
 import { S3Service } from '../../shared/s3/s3.service';
+import { RevalidationService } from '../../modules/cms/services/revalidation.service';
 import { User } from '../../modules/users/entities/user.entity';
 import { Post } from '../../modules/posts/entities/post.entity';
 import { PostCategory } from '../../modules/posts/entities/post-category.entity';
@@ -100,7 +103,17 @@ export class AdminPostsService {
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
     private readonly s3: S3Service,
+    private readonly revalidation: RevalidationService,
   ) {}
+
+  /** Website: the blog list and these posts' pages show the change on the next visit. */
+  private revalidatePosts(slugs: string[]): void {
+    this.revalidation.revalidate([
+      CACHE_TAGS.posts,
+      CACHE_TAGS.page(BLOG_PAGE_KEY),
+      ...slugs.map((slug) => CACHE_TAGS.post(slug)),
+    ]);
+  }
 
   private get posts(): Repository<Post> {
     return this.ds.getRepository(Post);
@@ -223,6 +236,7 @@ export class AdminPostsService {
       if (input.categoryIds) await setCategories(manager, saved.id, input.categoryIds);
       return saved.id;
     });
+    this.revalidatePosts([input.slug]);
     return this.getById(id, locale);
   }
 
@@ -231,6 +245,7 @@ export class AdminPostsService {
     if (!post) {
       throw new HttpError(404, 'POST_NOT_FOUND', 'Post not found');
     }
+    const previousSlug = post.slug;
     if (patch.slug !== undefined && patch.slug !== post.slug) {
       await this.assertSlugFree(patch.slug, post.id);
     }
@@ -277,6 +292,7 @@ export class AdminPostsService {
         : null,
     ];
     await this.deleteUnusedImages(replaced);
+    this.revalidatePosts([previousSlug, post.slug]);
     return this.getById(post.id, locale);
   }
 
@@ -295,6 +311,8 @@ export class AdminPostsService {
     }
     await this.translations.delete({ postId: id, locale });
     await this.deleteUnusedImages([target.imageUrl, target.ogImageUrl]);
+    const post = await this.posts.findOne({ where: { id } });
+    this.revalidatePosts(post ? [post.slug] : []);
   }
 
   async remove(id: string): Promise<void> {
@@ -303,7 +321,9 @@ export class AdminPostsService {
       throw new HttpError(404, 'POST_NOT_FOUND', 'Post not found');
     }
     const versions = await this.translations.find({ where: { postId: id } });
+    const slug = post.slug;
     await this.posts.remove(post);
+    this.revalidatePosts([slug]);
     await this.deleteUnusedImages(
       versions.flatMap((version) => [version.imageUrl, version.ogImageUrl]),
     );

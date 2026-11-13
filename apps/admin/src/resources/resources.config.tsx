@@ -1,7 +1,9 @@
 import { lazy, type ComponentType } from 'react';
 import type { SvgIconComponent } from '@mui/icons-material';
 import {
+  AltRoute,
   Article,
+  Feed,
   Category,
   Description,
   ManageAccounts,
@@ -28,6 +30,17 @@ const CategoryEdit = lazy(() =>
 );
 const CategoryCreate = lazy(() =>
   import('./categories/CategoryForm').then((m) => ({ default: m.CategoryCreate })),
+);
+const PageList = lazy(() => import('./pages/PageList').then((m) => ({ default: m.PageList })));
+const PageEdit = lazy(() => import('./pages/PageEdit').then((m) => ({ default: m.PageEdit })));
+const RedirectList = lazy(() =>
+  import('./redirects/RedirectList').then((m) => ({ default: m.RedirectList })),
+);
+const RedirectCreate = lazy(() =>
+  import('./redirects/RedirectForm').then((m) => ({ default: m.RedirectCreate })),
+);
+const RedirectEdit = lazy(() =>
+  import('./redirects/RedirectForm').then((m) => ({ default: m.RedirectEdit })),
 );
 const UserList = lazy(() => import('./users/UserList').then((m) => ({ default: m.UserList })));
 const UserEdit = lazy(() => import('./users/UserEdit').then((m) => ({ default: m.UserEdit })));
@@ -81,6 +94,25 @@ export interface AdminResourceConfig {
  * dataProvider's REST contract.
  */
 export const ADMIN_RESOURCES: AdminResourceConfig[] = [
+  {
+    // Top-level under "Management", like Delta Lektorat's admin
+    name: 'pages',
+    label: 'Pages',
+    icon: Feed,
+    roles: [Role.ADMIN],
+    list: PageList,
+    edit: PageEdit,
+  },
+  {
+    name: 'redirects',
+    label: 'Redirects',
+    icon: AltRoute,
+    group: 'settings',
+    roles: [Role.ADMIN],
+    list: RedirectList,
+    create: RedirectCreate,
+    edit: RedirectEdit,
+  },
   {
     name: 'posts',
     label: 'Articles',

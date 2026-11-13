@@ -12,7 +12,8 @@ export const darkTheme: RaThemeOptions = deepMerge(deepMerge(defaultDarkTheme, b
       light: brand[300],
       main: brand[500],
       dark: brand[400],
-      contrastText: neutral[950],
+      // Text on orange fills is always white (buttons, chips, badges)
+      contrastText: '#FFFFFF',
     },
     secondary: {
       light: neutral[300],
@@ -30,7 +31,8 @@ export const darkTheme: RaThemeOptions = deepMerge(deepMerge(defaultDarkTheme, b
       light: semantic.warning.light,
       main: semantic.warning.light,
       dark: semantic.warning.main,
-      contrastText: neutral[950],
+      // Amber/orange fill (e.g. warning notifications): white text, like primary
+      contrastText: '#FFFFFF',
     },
     error: {
       light: semantic.error.light,

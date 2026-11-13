@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { DataSource, EntityManager, EntityTarget } from 'typeorm';
+import type { RevalidationService } from '../../modules/cms/services/revalidation.service';
 import { AdminPostsService } from './admin-posts.service';
 import { Post } from '../../modules/posts/entities/post.entity';
 import { PostCategory } from '../../modules/posts/entities/post-category.entity';
@@ -137,7 +138,13 @@ beforeEach(() => {
     manager,
     transaction: (work: (m: EntityManager) => Promise<unknown>) => work(manager),
   } as unknown as DataSource;
-  service = new AdminPostsService(ds, s3 as unknown as S3Service);
+  service = new AdminPostsService(
+    ds,
+    s3 as unknown as S3Service,
+    {
+      revalidate: vi.fn(),
+    } as unknown as RevalidationService,
+  );
   // getById after writes reads the saved post back
   posts.createQueryBuilder.mockImplementation(() =>
     makePostQb({ one: savedPost ? { ...savedPost, author, translation: null } : null }),

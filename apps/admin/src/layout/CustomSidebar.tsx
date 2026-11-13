@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Menu, ResourceMenuItem, usePermissions, useSidebarState } from 'react-admin';
 import { Dashboard } from '@mui/icons-material';
-import { Box, Divider } from '@mui/material';
+import { Box, Divider, Typography } from '@mui/material';
 import type { Role } from '@tsyvinda/shared-types';
 import {
   ADMIN_CUSTOM_PAGES,
@@ -103,11 +103,21 @@ export const CustomSidebar: React.FC = () => {
     >
       <Menu>
         <Menu.Item to="/" primaryText="Dashboard" leftIcon={<Dashboard />} />
-        {groups.filter((group) => !group.pinBottom).map(renderGroup)}
+        <Divider sx={{ my: 1 }} />
+        {open && (
+          <Typography
+            variant="overline"
+            component="div"
+            sx={{ px: 2, color: 'text.secondary', lineHeight: 2 }}
+          >
+            Management
+          </Typography>
+        )}
         {ungroupedResources.map((resource) => (
           <ResourceMenuItem key={resource.name} name={resource.name} />
         ))}
         {visiblePages.filter((page) => !page.group).map(renderPageItem)}
+        {groups.filter((group) => !group.pinBottom).map(renderGroup)}
         {/* Bottom section (e.g. Settings): last in the menu, after a divider */}
         {bottomGroups.length > 0 && <Divider sx={{ my: 1 }} />}
         {bottomGroups.map(renderGroup)}
