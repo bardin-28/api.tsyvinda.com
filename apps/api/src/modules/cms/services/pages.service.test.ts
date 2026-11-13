@@ -107,7 +107,7 @@ describe('PagesService.save', () => {
   it('deletes uploaded images the page no longer shows, after saving', async () => {
     const withPhoto = fullDraft();
     withPhoto.blocks[0]!.data.avatar = `${S3_BASE}/pages/old.webp`;
-    withPhoto.seo.ogImageUrl = 'https://elsewhere.example/share.png';
+    withPhoto.seo.ogImageUrl = { en: 'https://elsewhere.example/share.png', uk: null };
     page.draft = withPhoto;
 
     const next = fullDraft();

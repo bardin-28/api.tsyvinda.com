@@ -249,7 +249,7 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: '',
         uk: '',
       },
-      ogImageUrl: null,
+      ogImageUrl: { en: null, uk: null },
       noindex: false,
     },
     blocks: [
@@ -405,7 +405,7 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: 'Vladyslav Tsyvinda about, Bardin28, Software Engineer, Front-end Lead, Frontend Developer, React engineer, Next.js engineer, TypeScript engineer, Kyiv Software Engineer, Ukrainian frontend developer',
         uk: 'Владислав Цивінда, Vladyslav Tsyvinda, Bardin28, Software Engineer, Front-end Lead, фронтенд-розробник, React-розробник, Next.js-розробник, TypeScript-розробник, програміст Київ, український фронтенд-розробник',
       },
-      ogImageUrl: null,
+      ogImageUrl: { en: null, uk: null },
       noindex: false,
     },
     blocks: [
@@ -647,7 +647,7 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: 'Vladyslav Tsyvinda contact, Bardin28 contact, hire frontend developer, contact React engineer, contact Next.js developer, Vladyslav Tsyvinda email, Vladyslav Tsyvinda LinkedIn',
         uk: 'Владислав Цивінда контакти, Vladyslav Tsyvinda contact, Bardin28, найняти фронтенд-розробника, звʼязатися з React-розробником, звʼязатися з Next.js-розробником, Владислав Цивінда email, Владислав Цивінда LinkedIn',
       },
-      ogImageUrl: null,
+      ogImageUrl: { en: null, uk: null },
       noindex: false,
     },
     blocks: [
@@ -696,7 +696,7 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: 'Vladyslav Tsyvinda blog, Frontend engineering, React, Next.js, TypeScript, Software engineering notes, Web development blog',
         uk: 'блог Владислава Цивінди, фронтенд-розробка, React, Next.js, TypeScript, нотатки інженера, блог про веброзробку',
       },
-      ogImageUrl: null,
+      ogImageUrl: { en: null, uk: null },
       noindex: false,
     },
     blocks: [
@@ -822,7 +822,7 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: '',
         uk: '',
       },
-      ogImageUrl: null,
+      ogImageUrl: { en: null, uk: null },
       noindex: false,
     },
     blocks: [
@@ -877,7 +877,7 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: '',
         uk: '',
       },
-      ogImageUrl: null,
+      ogImageUrl: { en: null, uk: null },
       noindex: false,
     },
     blocks: [

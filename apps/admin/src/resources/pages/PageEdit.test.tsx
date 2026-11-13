@@ -28,7 +28,7 @@ const page: AdminPage = {
       title: text('Contacts', 'Контакти'),
       description: text('Reach me', 'Пишіть'),
       keywords: text(''),
-      ogImageUrl: null,
+      ogImageUrl: { en: null, uk: null },
       noindex: false,
     },
     blocks: [
