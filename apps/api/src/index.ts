@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import './shared/load-env';
-import { randomUUID } from 'crypto';
+import { uuidv7 } from './shared/uuid-v7';
 import type { IncomingMessage, ServerResponse } from 'http';
 import type { Request, Response, NextFunction } from 'express';
 import { ValidationPipe } from '@nestjs/common';
@@ -16,6 +16,7 @@ import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { PostsModule } from './modules/posts/posts.module';
+import { SiteSettingsModule } from './modules/site-settings/site-settings.module';
 import { ADMIN_ACCESS_COOKIE_NAME } from './modules/auth/shared/auth.utils';
 import { config } from './shared/app.config';
 import { logger } from './shared/logger';
@@ -43,7 +44,7 @@ async function bootstrap(): Promise<void> {
       logger,
       genReqId: (req: IncomingMessage, res: ServerResponse) => {
         const incoming = req.headers['x-request-id'];
-        const id = typeof incoming === 'string' && incoming ? incoming : randomUUID();
+        const id = typeof incoming === 'string' && incoming ? incoming : uuidv7();
         res.setHeader('x-request-id', id);
         return id;
       },
@@ -99,7 +100,7 @@ async function bootstrap(): Promise<void> {
       '/docs',
       app,
       SwaggerModule.createDocument(app, swaggerConfig, {
-        include: [HealthModule, AuthModule, UsersModule, PostsModule],
+        include: [HealthModule, AuthModule, UsersModule, PostsModule, SiteSettingsModule],
       }),
     );
 

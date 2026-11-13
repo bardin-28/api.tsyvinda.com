@@ -2,18 +2,42 @@ import React from 'react';
 import {
   CreateButton,
   Datagrid,
-  DateField,
+  EditButton,
   FunctionField,
   List,
+  ReferenceInput,
   SearchInput,
-  TextField,
+  SelectInput,
   TopToolbar,
 } from 'react-admin';
-import { Avatar } from '@mui/material';
 import { Article } from '@mui/icons-material';
-import type { Post } from '@tsyvinda/shared-types';
+import type { AdminPost } from '@tsyvinda/shared-types';
+import { TruncatedText, TruncatedTextField } from '../../components/TruncatedText';
+import { ListEmpty, ListNoResults } from '../../components/EmptyState';
+import { PostStatusChip } from '../../components/PostStatusChip';
+import { formatDate, formatDateTime } from '../../lib/dateFormat';
+import { EMPTY_CELL, listRowsPerPage } from '../../theme';
+import { LocaleChips } from '../../components/Translations';
 
-const filters = [<SearchInput key="q" source="q" alwaysOn placeholder="Search title or slug" />];
+const STATUS_CHOICES = [
+  { id: 'published', name: 'Published' },
+  { id: 'draft', name: 'Draft' },
+];
+
+const filters = [
+  <SearchInput key="q" source="q" alwaysOn placeholder="Search" />,
+  <ReferenceInput
+    key="categoryId"
+    source="categoryId"
+    reference="categories"
+    sort={{ field: 'name', order: 'ASC' }}
+    perPage={100}
+    alwaysOn
+  >
+    <SelectInput label="Category" optionText="name" />
+  </ReferenceInput>,
+  <SelectInput key="status" source="status" label="Status" choices={STATUS_CHOICES} alwaysOn />,
+];
 
 const ListActions: React.FC = () => (
   <TopToolbar>
@@ -25,33 +49,58 @@ export const PostList: React.FC = () => (
   <List
     filters={filters}
     actions={<ListActions />}
-    sort={{ field: 'createdAt', order: 'DESC' }}
-    perPage={25}
+    sort={{ field: 'updatedAt', order: 'DESC' }}
+    perPage={listRowsPerPage}
+    empty={
+      <ListEmpty
+        icon={Article}
+        subtitle="Articles you write appear here and on the website blog."
+      />
+    }
   >
-    <Datagrid rowClick="edit">
-      <FunctionField<Post>
-        label="Cover"
+    <Datagrid rowClick="edit" empty={<ListNoResults />}>
+      <TruncatedTextField source="title" label="Title" />
+      <FunctionField<AdminPost>
+        label="Languages"
+        sortable={false}
+        render={(post) => <LocaleChips locales={post.locales} />}
+      />
+      <FunctionField<AdminPost>
+        label="Categories"
         sortable={false}
         render={(post) => (
-          <Avatar
-            variant="rounded"
-            src={post.imageUrl ?? undefined}
-            alt=""
-            sx={{ width: 48, height: 32 }}
-          >
-            <Article fontSize="small" />
-          </Avatar>
+          <TruncatedText
+            text={post.categories.map((category) => category.name).join(', ') || null}
+            maxWidth={220}
+          />
         )}
       />
-      <TextField source="title" />
-      <TextField source="slug" />
-      <FunctionField<Post>
+      <FunctionField<AdminPost>
         label="Author"
         sortable={false}
-        render={(post) => `${post.author.firstName} ${post.author.lastName}`.trim()}
+        render={(post) => (
+          <TruncatedText
+            text={`${post.author.firstName} ${post.author.lastName}`.trim()}
+            maxWidth={180}
+          />
+        )}
       />
-      <DateField source="createdAt" label="Created" showTime />
-      <DateField source="updatedAt" label="Updated" showTime />
+      <FunctionField<AdminPost>
+        label="Status"
+        source="status"
+        render={(post) => <PostStatusChip status={post.status} />}
+      />
+      <FunctionField<AdminPost>
+        label="Date"
+        source="publishedAt"
+        render={(post) => formatDate(post.publishedAt) || EMPTY_CELL}
+      />
+      <FunctionField<AdminPost>
+        label="Updated at"
+        source="updatedAt"
+        render={(post) => formatDateTime(post.updatedAt)}
+      />
+      <EditButton />
     </Datagrid>
   </List>
 );

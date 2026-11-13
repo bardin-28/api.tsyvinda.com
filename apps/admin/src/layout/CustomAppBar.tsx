@@ -10,6 +10,7 @@ import {
 } from 'react-admin';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { BrandMark } from './BrandMark';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 /**
  * Global "request in flight" hint. RA bundles this with a manual refresh button
@@ -34,6 +35,7 @@ const AppBarToolbar: React.FC = () => {
 
   return (
     <>
+      <LanguageSwitcher />
       {darkTheme && <ToggleThemeButton />}
       <LoadingHint />
     </>
@@ -53,7 +55,7 @@ export const CustomAppBar: React.FC = () => (
     <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.5, mr: 2 }}>
       <BrandMark size={22} fontSize={11} />
       <Typography variant="subtitle1" noWrap sx={{ letterSpacing: '-0.01em' }}>
-        tsyvinda.com Admin
+        Tsyvinda - Admin Panel
       </Typography>
       {/* Page title RA publishes from the current view, right of the brand */}
       <TitlePortal

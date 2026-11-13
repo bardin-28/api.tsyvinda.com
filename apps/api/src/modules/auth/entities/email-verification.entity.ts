@@ -1,17 +1,10 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { PrimaryUuidV7Column } from '../../../db/primary-uuid-v7';
 import { User } from '../../users/entities/user.entity';
 
 @Entity('email_verifications')
 export class EmailVerification {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryUuidV7Column()
   id: string;
 
   @Column({ type: 'uuid' })

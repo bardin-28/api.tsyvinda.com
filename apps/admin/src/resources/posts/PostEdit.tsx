@@ -1,31 +1,37 @@
 import React from 'react';
-import { DeleteButton, Edit, SaveButton, Toolbar, useRecordContext } from 'react-admin';
-import type { Post } from '@tsyvinda/shared-types';
+import { Edit, useRecordContext } from 'react-admin';
+import type { AdminPost } from '@tsyvinda/shared-types';
 import { PostForm } from './PostForm';
 import { toPostPayload, type PostFormValues } from './postPayload';
-
-const PostEditToolbar: React.FC = () => (
-  <Toolbar sx={{ justifyContent: 'space-between' }}>
-    <SaveButton />
-    {/* pessimistic: asks for confirmation, deletes only after the API confirms */}
-    <DeleteButton mutationMode="pessimistic" confirmTitle="Delete this post?" />
-  </Toolbar>
-);
+import { PublishCard, SettingsCard } from './PostSidebar';
+import { TranslationsCard } from '../../components/Translations';
 
 const PostTitle: React.FC = () => {
-  const record = useRecordContext<Post>();
-  return <>{record ? `Post “${record.title}”` : 'Post'}</>;
+  const record = useRecordContext<AdminPost>();
+  return <>{record?.title ? `Post “${record.title}”` : 'Post'}</>;
 };
 
 export const PostEdit: React.FC = () => (
   <Edit
     title={<PostTitle />}
+    // Actions live in the sticky sidebar; no Card wrapper (it would clip the sticky column)
+    actions={false}
+    component="div"
     mutationMode="pessimistic"
-    transform={(values: PostFormValues, options?: { previousData?: Post }) =>
+    // Stay on the page after saving (status and "last saved" update in place)
+    redirect={false}
+    transform={(values: PostFormValues, options?: { previousData?: AdminPost }) =>
       toPostPayload(values, options?.previousData)
     }
-    sx={{ maxWidth: 1100 }}
   >
-    <PostForm toolbar={<PostEditToolbar />} />
+    <PostForm
+      sidebar={
+        <>
+          <PublishCard />
+          <TranslationsCard />
+          <SettingsCard />
+        </>
+      }
+    />
   </Edit>
 );

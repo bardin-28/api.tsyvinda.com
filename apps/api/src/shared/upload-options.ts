@@ -28,14 +28,15 @@ const imageFileFilter: NonNullable<MulterOptions['fileFilter']> = (_req, file, c
   cb(null, true);
 };
 
-// In-memory single-`image` upload (file.buffer) for routes that stream the buffer
-// straight to S3. No disk write, no filename — the handler builds the object key.
+// In-memory image upload (file.buffer) for routes that stream the buffer straight to S3.
+// No disk write, no filename — the handler builds the object key. `maxFiles` > 1 is for
+// FileFieldsInterceptor routes with several image fields (e.g. a post's cover + OG image).
 // MulterError (size) and the HttpError passed to fileFilter propagate to the
 // global exception filter, which maps them to 413/400.
-export function imageUploadMemoryOptions(): MulterOptions {
+export function imageUploadMemoryOptions(maxFiles = 1): MulterOptions {
   return {
     storage: memoryStorage(),
-    limits: { fileSize: MAX_SIZE, files: 1 },
+    limits: { fileSize: MAX_SIZE, files: maxFiles },
     fileFilter: imageFileFilter,
   };
 }

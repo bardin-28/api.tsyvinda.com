@@ -2,6 +2,7 @@ import type { Theme } from '@mui/material/styles';
 import type { RaThemeOptions } from 'react-admin';
 import {
   brand,
+  brandTint,
   dropdownMaxHeight,
   EMPTY_CELL,
   duration,
@@ -30,7 +31,11 @@ export const buildComponents = (mode: Mode): RaThemeOptions['components'] => {
   // 400 on the dark header ground lands at 4.38:1 — below AA for the
   // 12px uppercase header text, so dark steps up to 300.
   const headerText = isLight ? neutral[600] : neutral[300];
-  const focusRing = isLight ? brand[500] : brand[400];
+  // One orange everywhere by design (no darker shades), although brand 500 on white is
+  // ~2.6:1 — below AA for text. Applies to the focus ring, orange text and the menu accent.
+  const focusRing = brand[500];
+  const brandText = brand[500];
+  const menuAccent = brand[500];
 
   return {
     // A blank cell is ambiguous — it reads as a rendering fault rather than an
@@ -54,7 +59,7 @@ export const buildComponents = (mode: Mode): RaThemeOptions['components'] => {
           outlineOffset: 2,
         },
         '::selection': {
-          backgroundColor: isLight ? brand[100] : brand[800],
+          backgroundColor: isLight ? brand[100] : brandTint(0.35),
         },
       },
     },
@@ -116,6 +121,17 @@ export const buildComponents = (mode: Mode): RaThemeOptions['components'] => {
         },
         sizeSmall: { paddingInline: 12 },
       },
+      // Text/outlined primary buttons: brand-orange text and border.
+      variants: [
+        {
+          props: { variant: 'text' as const, color: 'primary' as const },
+          style: { color: brandText },
+        },
+        {
+          props: { variant: 'outlined' as const, color: 'primary' as const },
+          style: { color: brandText, borderColor: brand[500] },
+        },
+      ],
     },
     MuiIconButton: {
       styleOverrides: {
@@ -181,6 +197,13 @@ export const buildComponents = (mode: Mode): RaThemeOptions['components'] => {
         root: { borderRadius: radius.sm, fontWeight: 600 },
         sizeSmall: { height: 22, fontSize: '0.6875rem' },
       },
+      // Filled orange chips (e.g. the Admin role) carry white text, like the brand mark
+      variants: [
+        {
+          props: { color: 'primary' as const, variant: 'filled' as const },
+          style: { color: '#FFFFFF' },
+        },
+      ],
     },
     MuiTooltip: {
       styleOverrides: {
@@ -239,17 +262,45 @@ export const buildComponents = (mode: Mode): RaThemeOptions['components'] => {
           },
           '& .RaDatagrid-rowCell': { color: 'inherit' },
           '& .RaDatagrid-row:hover': { backgroundColor: hoverSurface },
-          // Long or wide lists scroll inside the table (RA keeps the header sticky)
-          '& .RaDatagrid-tableWrapper': {
-            maxHeight: tableMaxHeight,
-            overflow: 'auto',
-          },
+          // Long or wide lists scroll inside the table (RA keeps the header sticky);
+          // RaList below sizes the wrapper to the free viewport space.
+          '& .RaDatagrid-tableWrapper': { overflow: 'auto' },
         },
       },
     },
     RaList: {
       styleOverrides: {
-        root: { minWidth: 0, '& .RaList-main': { minWidth: 0 } },
+        root: {
+          minWidth: 0,
+          // List pages: the layout is viewport-high (see RaLayout) and RaLayout-content is a flex
+          // column. The table card fits its rows (no minimum height); a long table stops at the
+          // bottom of the viewport and scrolls inside, so pagination stays visible.
+          flexGrow: 1,
+          minHeight: 0,
+          '& .RaList-main': { minWidth: 0, minHeight: 0 },
+          '& .RaList-content': {
+            flex: '0 1 auto',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+          // A "no results" placeholder (EmptyState, role=status) gets the full height to centre in
+          '& .RaList-content:has([role="status"])': { flex: '1 1 0' },
+          '& .RaDatagrid-root': {
+            flex: '0 1 auto',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+          '& .RaDatagrid-tableWrapper': { flex: '0 1 auto', minHeight: 0 },
+          // Empty list: RaEmpty sits in the center of that space
+          '& > .RaList-noResults': {
+            flexGrow: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+        },
       },
     },
     RaAppBar: {
@@ -283,6 +334,16 @@ export const buildComponents = (mode: Mode): RaThemeOptions['components'] => {
             backgroundColor: 'transparent',
             minWidth: 0,
           },
+          // List pages: pin the layout to the viewport so RaList can fill the free height and
+          // scroll its table internally. If the viewport is shorter than the table's minimum,
+          // the content area scrolls instead. Other pages keep normal page scrolling.
+          // `list-page` is the plain class RA's <List> root carries (its RaList-root class is
+          // emotion-generated, e.g. `css-…-RaList-root`, so it can't be targeted here).
+          '&:has(.list-page)': {
+            height: '100dvh',
+            '& .RaLayout-appFrame, & .RaLayout-contentWithSidebar': { minHeight: 0 },
+            '& .RaLayout-content': { minHeight: 0, overflowY: 'auto' },
+          },
         },
       },
     },
@@ -299,14 +360,14 @@ export const buildComponents = (mode: Mode): RaThemeOptions['components'] => {
             transition: `color ${duration.fast}ms ease`,
           },
           '&:hover': {
-            color: isLight ? brand[600] : brand[300],
-            backgroundColor: isLight ? brand[50] : 'rgba(139, 133, 255, 0.08)',
+            color: menuAccent,
+            backgroundColor: isLight ? brand[50] : brandTint(0.08),
             '& .RaMenuItemLink-icon': { color: 'inherit' },
           },
           '&.RaMenuItemLink-active': {
             fontWeight: 600,
-            color: isLight ? brand[600] : brand[300],
-            backgroundColor: isLight ? brand[50] : 'rgba(139, 133, 255, 0.12)',
+            color: menuAccent,
+            backgroundColor: isLight ? brand[50] : brandTint(0.12),
             '& .RaMenuItemLink-icon': { color: 'inherit' },
           },
         },

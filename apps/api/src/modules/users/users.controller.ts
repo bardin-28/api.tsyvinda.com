@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiCookieAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { randomUUID } from 'crypto';
+import { uuidv7 } from '../../shared/uuid-v7';
 import { UserDto } from '../auth/dto/user.response';
 import { HttpError } from '../../shared/http-error';
 import { extForMime, imageUploadMemoryOptions } from '../../shared/upload-options';
@@ -56,7 +56,7 @@ export class UsersController {
 
     const profileImageUrl = file
       ? await this.s3.put(
-          `profile/${randomUUID()}.${extForMime(file.mimetype)}`,
+          `profile/${uuidv7()}.${extForMime(file.mimetype)}`,
           file.buffer,
           file.mimetype,
         )

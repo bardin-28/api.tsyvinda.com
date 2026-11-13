@@ -3,7 +3,7 @@
  * Framework-agnostic on purpose — no MUI imports — so the same values can back
  * a theme, a test assertion, or a future non-MUI surface.
  *
- * Palette references Stripe's: blurple brand, blue-tinted navy neutrals.
+ * Palette: the website's orange brand (shared with fe), blue-tinted navy neutrals.
  */
 
 /**
@@ -24,19 +24,26 @@ export const neutral = {
   950: '#061C2E',
 } as const;
 
-/** Stripe blurple. 500 is the signature value and clears AA on white. */
+/**
+ * Website brand orange (fe `#fd7e14`), Open Color orange steps. The admin uses one orange: 500
+ * for everything (text, fills, borders, focus), 400 for hover, 50/100 for light washes. The
+ * darker 600–900 steps are kept for reference only — don't use them in the UI.
+ */
 export const brand = {
-  50: '#F5F4FF',
-  100: '#EBE9FE',
-  200: '#D7D4FF',
-  300: '#A9A4FF',
-  400: '#8B85FF',
-  500: '#635BFF',
-  600: '#5548C8',
-  700: '#4A3FB0',
-  800: '#3A3191',
-  900: '#2D2675',
+  50: '#FFF4E6',
+  100: '#FFE8CC',
+  200: '#FFD8A8',
+  300: '#FFC078',
+  400: '#FFA94D',
+  500: '#FD7E14',
+  600: '#E8590C',
+  700: '#C2410C',
+  800: '#9A3412',
+  900: '#7C2D12',
 } as const;
+
+/** Translucent brand wash for dark-mode hover/active/selected backgrounds. */
+export const brandTint = (alpha: number): string => `rgba(253, 126, 20, ${alpha})`;
 
 /**
  * `light` is the dark-mode-facing tint and `main` the light-mode one — dark
@@ -79,8 +86,14 @@ export const sidebarWidth = { open: 256, closed: 56 } as const;
 /** Datagrid rows: RA's default height wastes vertical space on dense lists. */
 export const rowHeight = 44;
 
-/** Tables scroll inside themselves; the offset leaves room for app bar, list toolbar and pagination. */
+/** Standalone tables (e.g. dashboard) scroll inside themselves past this height. */
 export const tableMaxHeight = 'calc(100dvh - 240px)';
+
+/** Text cells wider than this end in an ellipsis; the full text shows in a tooltip. */
+export const cellMaxWidth = 320;
+
+/** Rows per page every list starts with. */
+export const listRowsPerPage = 50;
 
 /** Long option lists scroll instead of covering the page: about seven options. */
 export const dropdownMaxHeight = 320;

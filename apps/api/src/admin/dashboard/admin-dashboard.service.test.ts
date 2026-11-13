@@ -20,7 +20,6 @@ describe('AdminDashboardService.getStats', () => {
       const where = opts?.where;
       if (!where) return 42;
       if (where.role === Role.ADMIN) return 2;
-      if (where.emailVerified === true && where.approvedByAdmin === false) return 5;
       if (where.emailVerified === false) return 7;
       if (sinceOf(where) === NOW.getTime() - 7 * DAY_MS) return 3;
       if (sinceOf(where) === NOW.getTime() - 30 * DAY_MS) return 11;
@@ -33,7 +32,6 @@ describe('AdminDashboardService.getStats', () => {
         lastName: 'Hopper',
         email: 'grace@example.com',
         emailVerified: true,
-        approvedByAdmin: false,
         createdAt: new Date('2026-10-23T08:00:00.000Z'),
       },
     ];
@@ -54,7 +52,6 @@ describe('AdminDashboardService.getStats', () => {
       users: {
         total: 42,
         admins: 2,
-        pendingApproval: 5,
         unverified: 7,
         newLast7Days: 3,
         newLast30Days: 11,

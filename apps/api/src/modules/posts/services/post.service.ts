@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { type DataSource, type Repository } from 'typeorm';
+import { type DataSource, type EntityManager, type Repository } from 'typeorm';
+import { DEFAULT_LOCALE, type Locale, type PostStatus } from '@tsyvinda/shared-types';
 import { HttpError } from '../../../shared/http-error';
-import { S3Service } from '../../../shared/s3/s3.service';
 import { User } from '../../users/entities/user.entity';
 import { Post } from '../entities/post.entity';
+import { PostTranslation } from '../entities/post-translation.entity';
 
 export interface PublicAuthor {
   id: string;
@@ -13,37 +14,40 @@ export interface PublicAuthor {
   profileImageUrl: string | null;
 }
 
+export interface PublicCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface PublicPost {
   id: string;
+  locale: Locale;
+  locales: Locale[];
   title: string;
   slug: string;
   description: string | null;
   htmlContent: string;
   imageUrl: string | null;
+  coverAlt: string | null;
   author: PublicAuthor;
+  categories: PublicCategory[];
+  status: PostStatus;
+  publishedAt: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  ogImageUrl: string | null;
+  canonicalUrl: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface CreatePostInput {
-  title: string;
-  slug: string;
-  description?: string;
-  htmlContent: string;
-  imageUrl?: string | null;
-}
-
-export interface UpdatePostInput {
-  title?: string;
-  slug?: string;
-  description?: string;
-  htmlContent?: string;
-  imageUrl?: string | null;
 }
 
 export interface ListPostsInput {
   limit: number;
   cursor?: string;
+  /** Category slug filter */
+  category?: string;
+  locale: Locale;
 }
 
 export interface ListPostsResult {
@@ -52,12 +56,15 @@ export interface ListPostsResult {
 }
 
 interface Cursor {
-  createdAt: string;
+  publishedAt: string;
   id: string;
 }
 
-export function encodeCursor(post: Pick<Post, 'createdAt' | 'id'>): string {
-  const payload: Cursor = { createdAt: post.createdAt.toISOString(), id: post.id };
+export function encodeCursor(post: { publishedAt: Date | null; id: string }): string {
+  const payload: Cursor = {
+    publishedAt: (post.publishedAt ?? new Date(0)).toISOString(),
+    id: post.id,
+  };
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
 }
 
@@ -73,18 +80,17 @@ export function decodeCursor(raw: string): Cursor {
   if (
     !parsed ||
     typeof parsed !== 'object' ||
-    typeof (parsed as Cursor).createdAt !== 'string' ||
+    typeof (parsed as Cursor).publishedAt !== 'string' ||
     typeof (parsed as Cursor).id !== 'string'
   ) {
     throw new HttpError(400, 'INVALID_CURSOR', 'Cursor payload is malformed');
   }
 
-  const c = parsed as Cursor;
-
-  if (Number.isNaN(Date.parse(c.createdAt))) {
-    throw new HttpError(400, 'INVALID_CURSOR', 'Cursor createdAt is not a valid date');
+  const cursor = parsed as Cursor;
+  if (Number.isNaN(Date.parse(cursor.publishedAt))) {
+    throw new HttpError(400, 'INVALID_CURSOR', 'Cursor publishedAt is not a valid date');
   }
-  return c;
+  return cursor;
 }
 
 export function toPublicAuthor(user: User): PublicAuthor {
@@ -96,149 +102,234 @@ export function toPublicAuthor(user: User): PublicAuthor {
   };
 }
 
-export function toPublicPost(post: Post, author: User): PublicPost {
+/** Translated fields of a post in one language; the empty version stands for "not translated". */
+export type PostTranslationFields = Pick<
+  PostTranslation,
+  | 'title'
+  | 'description'
+  | 'htmlContent'
+  | 'imageUrl'
+  | 'coverAlt'
+  | 'seoTitle'
+  | 'seoDescription'
+  | 'ogImageUrl'
+  | 'canonicalUrl'
+>;
+
+export const EMPTY_TRANSLATION: PostTranslationFields = {
+  title: '',
+  description: null,
+  htmlContent: '',
+  imageUrl: null,
+  coverAlt: null,
+  seoTitle: null,
+  seoDescription: null,
+  ogImageUrl: null,
+  canonicalUrl: null,
+};
+
+export interface PostLocaleView {
+  locale: Locale;
+  /** Languages the post is translated into */
+  locales: Locale[];
+  translation: PostTranslationFields;
+}
+
+export function toPublicPost(
+  post: Post,
+  author: User,
+  view: PostLocaleView,
+  categories: PublicCategory[] = [],
+): PublicPost {
+  const { translation } = view;
   return {
     id: post.id,
-    title: post.title,
+    locale: view.locale,
+    locales: view.locales,
+    title: translation.title,
     slug: post.slug,
-    description: post.description,
-    htmlContent: post.htmlContent,
-    imageUrl: post.imageUrl,
+    description: translation.description,
+    htmlContent: translation.htmlContent,
+    imageUrl: translation.imageUrl,
+    coverAlt: translation.coverAlt,
     author: toPublicAuthor(author),
+    categories,
+    status: post.status,
+    publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
+    seoTitle: translation.seoTitle,
+    seoDescription: translation.seoDescription,
+    ogImageUrl: translation.ogImageUrl,
+    canonicalUrl: translation.canonicalUrl,
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
   };
 }
 
+/**
+ * Ordered categories (main first) of each post, keyed by post id. Names are in `locale`, falling
+ * back to English (then the slug) when a category has no name in that language yet.
+ */
+export async function loadPostCategories(
+  manager: EntityManager,
+  postIds: string[],
+  locale: Locale,
+): Promise<Map<string, PublicCategory[]>> {
+  const byPost = new Map<string, PublicCategory[]>();
+  if (postIds.length === 0) return byPost;
+  const rows: { postId: string; id: string; slug: string; name: string }[] = await manager.query(
+    `SELECT link."postId" AS "postId", category.id, category.slug,
+            COALESCE(localized.name, fallback.name, category.slug) AS name
+     FROM post_category_links link
+     JOIN post_categories category ON category.id = link."categoryId"
+     LEFT JOIN post_category_translations localized
+       ON localized."categoryId" = category.id AND localized.locale = $2
+     LEFT JOIN post_category_translations fallback
+       ON fallback."categoryId" = category.id AND fallback.locale = $3
+     WHERE link."postId" = ANY($1)
+     ORDER BY link.position ASC`,
+    [postIds, locale, DEFAULT_LOCALE],
+  );
+  for (const row of rows) {
+    const list = byPost.get(row.postId) ?? [];
+    list.push({ id: row.id, name: row.name, slug: row.slug });
+    byPost.set(row.postId, list);
+  }
+  return byPost;
+}
+
+/** Languages each post is translated into (sorted, English first), keyed by post id. */
+export async function loadPostLocales(
+  manager: EntityManager,
+  postIds: string[],
+): Promise<Map<string, Locale[]>> {
+  const byPost = new Map<string, Locale[]>();
+  if (postIds.length === 0) return byPost;
+  const rows = await manager
+    .getRepository(PostTranslation)
+    .createQueryBuilder('translation')
+    .select(['translation.postId', 'translation.locale'])
+    .where('translation.postId IN (:...postIds)', { postIds })
+    .orderBy('translation.locale', 'ASC')
+    .getMany();
+  for (const row of rows) {
+    const list = byPost.get(row.postId) ?? [];
+    list.push(row.locale);
+    byPost.set(row.postId, list);
+  }
+  return byPost;
+}
+
+type PostWithTranslation = Post & { author: User; translation: PostTranslation };
+
+// Website-facing, read-only: only `published` posts translated into the requested language are
+// listed or readable, newest "date shown" first. Writing happens in the admin panel.
 @Injectable()
 export class PostService {
-  constructor(
-    @InjectDataSource() private readonly ds: DataSource,
-    private readonly s3: S3Service,
-  ) {}
+  constructor(@InjectDataSource() private readonly ds: DataSource) {}
 
   private get posts(): Repository<Post> {
     return this.ds.getRepository(Post);
   }
 
-  private get users(): Repository<User> {
-    return this.ds.getRepository(User);
+  /** Published posts joined with their `locale` version; posts without one are left out. */
+  private publishedIn(locale: Locale) {
+    return this.posts
+      .createQueryBuilder('post')
+      .innerJoinAndMapOne('post.author', User, 'author', 'author.id = post.authorId')
+      .innerJoinAndMapOne(
+        'post.translation',
+        PostTranslation,
+        'translation',
+        'translation.postId = post.id AND translation.locale = :locale',
+        { locale },
+      )
+      .where("post.status = 'published'");
   }
 
-  async create(authorId: string, input: CreatePostInput): Promise<PublicPost> {
-    const author = await this.users.findOne({ where: { id: authorId } });
-
-    if (!author) {
-      throw new HttpError(404, 'USER_NOT_FOUND', 'Author not found');
-    }
-
-    const slugTaken = await this.posts.findOne({ where: { slug: input.slug } });
-
-    if (slugTaken) {
-      throw new HttpError(409, 'SLUG_TAKEN', 'Slug already in use');
-    }
-
-    const post = this.posts.create({
-      title: input.title,
-      slug: input.slug,
-      description: input.description ?? null,
-      htmlContent: input.htmlContent,
-      imageUrl: input.imageUrl ?? null,
-      authorId,
-    });
-
-    const saved = await this.posts.save(post);
-    return toPublicPost(saved, author);
+  private async toPublicPosts(rows: PostWithTranslation[], locale: Locale): Promise<PublicPost[]> {
+    const postIds = rows.map((post) => post.id);
+    const [categories, locales] = await Promise.all([
+      loadPostCategories(this.ds.manager, postIds, locale),
+      loadPostLocales(this.ds.manager, postIds),
+    ]);
+    return rows.map((post) =>
+      toPublicPost(
+        post,
+        post.author,
+        { locale, locales: locales.get(post.id) ?? [locale], translation: post.translation },
+        categories.get(post.id) ?? [],
+      ),
+    );
   }
 
   async list(input: ListPostsInput): Promise<ListPostsResult> {
-    const qb = this.posts
-      .createQueryBuilder('post')
-      .innerJoinAndMapOne('post.author', User, 'author', 'author.id = post.authorId')
-      .orderBy('post.createdAt', 'DESC')
+    const qb = this.publishedIn(input.locale)
+      .orderBy('post.publishedAt', 'DESC')
       .addOrderBy('post.id', 'DESC')
       .limit(input.limit + 1);
 
+    if (input.category) {
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM post_category_links link
+                 JOIN post_categories category ON category.id = link."categoryId"
+                 WHERE link."postId" = post.id AND category.slug = :categorySlug)`,
+        { categorySlug: input.category },
+      );
+    }
+
     if (input.cursor) {
       const cursor = decodeCursor(input.cursor);
-
-      qb.where('(post.createdAt < :cAt OR (post.createdAt = :cAt AND post.id < :cId))', {
-        cAt: cursor.createdAt,
+      qb.andWhere('(post.publishedAt < :cAt OR (post.publishedAt = :cAt AND post.id < :cId))', {
+        cAt: cursor.publishedAt,
         cId: cursor.id,
       });
     }
 
-    const rows = await qb.getMany();
+    const rows = (await qb.getMany()) as PostWithTranslation[];
     const hasMore = rows.length > input.limit;
     const slice = hasMore ? rows.slice(0, input.limit) : rows;
     const last = slice[slice.length - 1];
 
     return {
-      items: slice.map((p) => toPublicPost(p, (p as Post & { author: User }).author)),
+      items: await this.toPublicPosts(slice, input.locale),
       nextCursor: hasMore && last ? encodeCursor(last) : null,
     };
   }
 
-  async getBySlug(slug: string): Promise<PublicPost> {
-    const post = await this.posts
-      .createQueryBuilder('post')
-      .innerJoinAndMapOne('post.author', User, 'author', 'author.id = post.authorId')
-      .where('post.slug = :slug', { slug })
-      .getOne();
+  async getBySlug(slug: string, locale: Locale): Promise<PublicPost> {
+    const post = (await this.publishedIn(locale)
+      .andWhere('post.slug = :slug', { slug })
+      .getOne()) as PostWithTranslation | null;
     if (!post) {
       throw new HttpError(404, 'POST_NOT_FOUND', 'Post not found');
     }
-    return toPublicPost(post, (post as Post & { author: User }).author);
+    const [view] = await this.toPublicPosts([post], locale);
+    if (!view) throw new Error('A row always maps to one view');
+    return view;
   }
 
-  async update(id: string, authorId: string, patch: UpdatePostInput): Promise<PublicPost> {
-    const post = await this.posts.findOne({ where: { id } });
-    if (!post) {
-      throw new HttpError(404, 'POST_NOT_FOUND', 'Post not found');
-    }
-    if (post.authorId !== authorId) {
-      throw new HttpError(403, 'FORBIDDEN', 'Only the author can edit this post');
-    }
-
-    const prevImage = post.imageUrl;
-
-    if (patch.slug !== undefined && patch.slug !== post.slug) {
-      const slugTaken = await this.posts.findOne({ where: { slug: patch.slug } });
-      if (slugTaken && slugTaken.id !== post.id) {
-        throw new HttpError(409, 'SLUG_TAKEN', 'Slug already in use');
-      }
-      post.slug = patch.slug;
-    }
-    if (patch.title !== undefined) post.title = patch.title;
-    if (patch.description !== undefined) post.description = patch.description;
-    if (patch.htmlContent !== undefined) post.htmlContent = patch.htmlContent;
-    if (patch.imageUrl !== undefined) post.imageUrl = patch.imageUrl;
-
-    const saved = await this.posts.save(post);
-
-    if (patch.imageUrl !== undefined && prevImage && prevImage !== patch.imageUrl) {
-      void this.s3.deleteByUrl(prevImage);
-    }
-
-    const author = await this.users.findOne({ where: { id: saved.authorId } });
-    if (!author) {
-      throw new HttpError(404, 'USER_NOT_FOUND', 'Author not found');
-    }
-    return toPublicPost(saved, author);
-  }
-
-  async remove(id: string, authorId: string): Promise<void> {
-    const post = await this.posts.findOne({ where: { id } });
-    if (!post) {
-      throw new HttpError(404, 'POST_NOT_FOUND', 'Post not found');
-    }
-    if (post.authorId !== authorId) {
-      throw new HttpError(403, 'FORBIDDEN', 'Only the author can delete this post');
-    }
-    const prevImage = post.imageUrl;
-    await this.posts.remove(post);
-    if (prevImage) {
-      void this.s3.deleteByUrl(prevImage);
-    }
+  /**
+   * Categories that have at least one published post in `locale`, alphabetically by their name
+   * in that language (English name when not translated yet).
+   */
+  async listCategories(locale: Locale): Promise<PublicCategory[]> {
+    return this.ds.query(
+      `SELECT category.id, category.slug,
+              COALESCE(localized.name, fallback.name, category.slug) AS name
+       FROM post_categories category
+       LEFT JOIN post_category_translations localized
+         ON localized."categoryId" = category.id AND localized.locale = $1
+       LEFT JOIN post_category_translations fallback
+         ON fallback."categoryId" = category.id AND fallback.locale = $2
+       WHERE EXISTS (
+         SELECT 1 FROM post_category_links link
+         JOIN posts post ON post.id = link."postId"
+         JOIN post_translations translation
+           ON translation."postId" = post.id AND translation.locale = $1
+         WHERE link."categoryId" = category.id AND post.status = 'published'
+       )
+       ORDER BY name ASC`,
+      [locale, DEFAULT_LOCALE],
+    );
   }
 }

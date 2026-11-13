@@ -1,34 +1,75 @@
-import type { Post } from '@tsyvinda/shared-types';
+import type { AdminPost, PostStatus } from '@tsyvinda/shared-types';
 
-/** The cover image as the form holds it: kept URL, newly picked file, or removed. */
-type CoverValue = string | { rawFile: File; src?: string } | null | undefined;
+/** Form-only flag: true = the cover is the OG image (any own OG image is dropped). */
+export const USE_COVER_AS_OG_FIELD = 'useCoverAsOgImage';
+
+/** An image as the form holds it: kept URL, newly picked file, or removed. */
+type ImageValue = string | { rawFile: File; src?: string } | null | undefined;
 
 export interface PostFormValues {
   title: string;
   slug: string;
   description?: string | null;
   htmlContent: string;
-  imageUrl?: CoverValue;
+  imageUrl?: ImageValue;
+  coverAlt?: string | null;
+  /** Empty on create = the signed-in admin */
+  authorId?: string | null;
+  categoryIds?: string[];
+  status?: PostStatus;
+  publishedAt?: string | Date | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  canonicalUrl?: string | null;
+  ogImageUrl?: ImageValue;
+  /** Undefined = untouched: keep whatever OG image is stored */
+  useCoverAsOgImage?: boolean;
 }
 
-const isPicked = (value: CoverValue): value is { rawFile: File } =>
+const isPicked = (value: ImageValue): value is { rawFile: File } =>
   typeof value === 'object' && value !== null && value.rawFile instanceof File;
 
+const toIsoOrEmpty = (value: PostFormValues['publishedAt']): string => {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+};
+
 /**
- * Form values → API body. A picked cover goes out as `image` (multipart via the dataProvider);
- * a removed one as `removeImage`; read-only fields (author, dates) never leave the form.
+ * Form values → API body. Picked images go out as `image` / `ogImage` (multipart via the
+ * dataProvider), removed ones as `removeImage` / `removeOgImage`. Optional text fields are sent
+ * as '' when empty, which the API stores as null; read-only fields never leave the form.
  */
 export function toPostPayload(
   values: PostFormValues,
-  previous?: Pick<Post, 'imageUrl'>,
+  previous?: Pick<AdminPost, 'imageUrl' | 'ogImageUrl'>,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     title: values.title,
     slug: values.slug,
     description: values.description ?? '',
     htmlContent: values.htmlContent,
+    coverAlt: values.coverAlt ?? '',
+    categoryIds: values.categoryIds ?? [],
+    status: values.status ?? 'draft',
+    publishedAt: toIsoOrEmpty(values.publishedAt),
+    seoTitle: values.seoTitle ?? '',
+    seoDescription: values.seoDescription ?? '',
+    canonicalUrl: values.canonicalUrl ?? '',
   };
+  if (values.authorId) payload.authorId = values.authorId;
+
   if (isPicked(values.imageUrl)) payload.image = values.imageUrl;
   else if (!values.imageUrl && previous?.imageUrl) payload.removeImage = true;
+
+  if (values.useCoverAsOgImage === true) {
+    // The cover doubles as the OG image: drop a stored dedicated one
+    if (previous?.ogImageUrl) payload.removeOgImage = true;
+  } else if (isPicked(values.ogImageUrl)) {
+    payload.ogImage = values.ogImageUrl;
+  } else if (!values.ogImageUrl && previous?.ogImageUrl) {
+    payload.removeOgImage = true;
+  }
+
   return payload;
 }

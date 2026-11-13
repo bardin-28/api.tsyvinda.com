@@ -75,8 +75,35 @@ src/
   admin/            Admin surface: admin-api.module.ts (RouterModule prefix /admin, ADMIN_API_MODULES),
                     guards/ (AdminGuard, AdminOriginGuard, AdminGuardsModule), auth/ (login/refresh/logout/me,
                     AdminBootstrapService), dashboard/ (GET /admin/dashboard), posts/ (CRUD on any post: paged list
-                    `{ items, total }`, multipart cover upload, `removeImage`, empty description clears)
+                    `{ items, total }`, multipart cover upload, `removeImage`, empty description clears),
+                    users/ (list/search/role filter with `postCount`; PATCH role and/or avatar `image`/`removeImage`;
+                    DELETE. 409s: CANNOT_DEMOTE_SELF, LAST_ADMIN, CANNOT_DELETE_SELF, USER_HAS_POSTS: posts cascade on delete),
+                    settings/ (GET/PATCH /admin/settings: site-wide settings row, e.g. `indexingEnabled`;
+                    public read at GET /site-settings via modules/site-settings)
 ```
+
+### Content languages (en default, uk)
+
+`LOCALES` / `DEFAULT_LOCALE` / `CONTENT_LOCALE_HEADER` live in `packages/shared-types/src/locales.ts`.
+Posts keep shared fields (slug, author, categories, status, publishedAt) in `posts`; title, lead,
+body, cover (`imageUrl` + `coverAlt`), SEO overrides, OG image and canonical are per language in
+`post_translations` (PK `postId, locale`). Category names are in `post_category_translations`
+(slug shared). Migration `1780500000000-ContentLocales` moved existing content into `en`.
+
+- Website endpoints take `?locale=` (default en): `/posts` and `/posts/:slug` return only posts
+  translated into that language (404 otherwise); category names fall back to English. Responses
+  carry `locale` and `locales` (languages the post exists in, for hreflang).
+- Admin endpoints read the language being edited from `X-Content-Locale` (`@ContentLocale()`,
+  `admin/content-locale.decorator.ts`; 400 `INVALID_LOCALE`). PATCH writes that language's fields
+  and creates the version when missing (needs title + content, else 400 `TRANSLATION_INCOMPLETE`).
+  `DELETE /admin/posts/:id/translations/:locale` removes one version (409 `LAST_TRANSLATION`).
+  Replaced/removed images are deleted from S3 only when no other language version uses them.
+- Admin app: `lib/contentLocale.ts` (store + localStorage `admin.contentLocale`); `apiClient` sends
+  the header on every call; `layout/LanguageSwitcher.tsx` in the app bar (asks before discarding
+  unsaved edits, resets react-query cache, `CustomLayout` remounts the page per language);
+  `components/Translations.tsx` (language chips, missing-version notice, "Languages" card).
+- Dev DB runs `synchronize`: when an entity change moves data between tables, stop the `app`
+  container and run the migration's `up` first, or synchronize drops the old columns.
 
 Admin app (`apps/admin/src/`): `services/apiClient.ts` (thin `fetch` wrapper, `credentials: 'include'`, single-flight refresh on 401,
 `toHttpError` maps our error body to RA `HttpError`), `auth/` (authProvider + sessionStore: cached user is only a
@@ -92,11 +119,11 @@ multipart; apiClient passes FormData through untouched (fetch sets the multipart
 Each feature is `src/modules/<name>/`:
 
 - `<name>.controller.ts` — `@Controller('<route>')`, route handlers returning values (or `@Res({ passthrough: true })` when setting cookies)
-- `<name>.module.ts` — `@Module` wiring `TypeOrmModule.forFeature([...])`, providers, controllers; imports `AuthModule` to consume `AuthGuard`/`ApprovedGuard`
+- `<name>.module.ts` — `@Module` wiring `TypeOrmModule.forFeature([...])`, providers, controllers; imports `AuthModule` to consume `AuthGuard`
 - `services/<name>.service.ts` — `@Injectable()` business logic; inject `@InjectDataSource()` / `@InjectRepository()`
 - `entities/*.entity.ts` — TypeORM entity (glob: `modules/**/*.entity.{ts,js}`)
 - `dto/*.dto.ts` — request DTOs (class-validator); `dto/*.response.ts` — `@ApiProperty` response models for Swagger
-- `guards/`, `decorators/` (auth module) — `AuthGuard`, `ApprovedGuard`, `@CurrentUser()`
+- `guards/`, `decorators/` (auth module) — `AuthGuard`, `@CurrentUser()`
 
 Register the module in `src/app.module.ts` `imports`. See `src/modules/health/` for the canonical small example.
 
@@ -115,7 +142,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 ### Errors, auth, rate limit, uploads, turnstile
 
 - **Errors**: one global `AllExceptionsFilter` maps `HttpError`, Nest `HttpException` (incl. 404 → `NOT_FOUND`), `MulterError` (413/400), and unknown → 500, all to `{ error: { code, message, details?, requestId? } }`. `requestId` comes from pino-http's `req.id`.
-- **Auth**: `@UseGuards(AuthGuard)` (reads `access` cookie, verifies JWT) and `ApprovedGuard` (DB approval check); read the user with `@CurrentUser()`.
+- **Auth**: `@UseGuards(AuthGuard)` (reads `access` cookie, verifies JWT); read the user with `@CurrentUser()`. There is no admin approval of website accounts (removed; `users.approvedByAdmin` dropped).
 - **Admin surface** (`src/admin/`): controllers live only there and are listed in `ADMIN_API_MODULES` (route prefix `/admin` + the `/docs-admin` Swagger doc). Every admin controller carries `@UseGuards(AdminOriginGuard)`; every non-auth handler also `AdminGuard`. Sessions are separated by **surface**: access JWTs carry `surface: 'website' | 'admin'` (missing = website), `refresh_tokens.surface` stops cross-surface rotation, admin cookies are `admin_access` / `admin_refresh` (host-only, `Path=/admin`). Admin login = `AuthService.login({ surface: 'admin' })`, rejects non-`ADMIN` users with the same 401 as a bad password. `AdminGuard` re-reads `users.role` per request (demotion is immediate). `AdminOriginGuard` rejects cookie writes whose `Origin` isn't `https://ADMIN_HOST` or the API host (CSRF). `ADMIN_DEFAULT_EMAIL`/`PASSWORD` creates (or promotes) the default admin on boot, never overwrites a password.
 - **Rate limit**: `@nestjs/throttler` + `@nest-lab/throttler-storage-redis`. Global default 100/60s via `ThrottlerGuard`; per-route overrides with `@Throttle({ default: { limit, ttl } })`. Admin login: 5/min per IP then a 15-min IP block (`blockDuration`), plus `AdminLoginLockoutService` (10 failed logins per email → 429 `LOGIN_LOCKED` for 15 min, counter reset on success).
 - **File upload**: `FileInterceptor('image', imageUploadMemoryOptions())` (multer **memoryStorage** in `src/shared/upload-options.ts`). The handler streams `file.buffer` to `S3Service.put(key, buffer, mime)` (`posts/<uuid>.<ext>` / `profile/<uuid>.<ext>`) and stores the returned public URL. Old objects are removed via `S3Service.deleteByUrl` in the service layer (no disk, no `CleanupUploadInterceptor`). Local = MiniStack, prod = AWS S3 (see `src/shared/s3/`).

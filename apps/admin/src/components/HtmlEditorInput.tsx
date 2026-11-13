@@ -1,19 +1,10 @@
 import React, { useState } from 'react';
 import { TextInput, useInput } from 'react-admin';
-import {
-  ClearButtons,
-  FormatButtons,
-  ImageButtons,
-  LevelSelect,
-  LinkButtons,
-  ListButtons,
-  QuoteButtons,
-  RichTextInput,
-  RichTextInputToolbar,
-} from 'ra-input-rich-text';
+import { RichTextInput } from 'ra-input-rich-text';
 import { Box, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { Code, TextFields } from '@mui/icons-material';
 import { monoFontFamily } from '../theme';
+import { ArticleToolbar } from './ArticleToolbar';
 
 export type EditorMode = 'visual' | 'html';
 
@@ -87,19 +78,35 @@ export const HtmlEditorInput: React.FC<HtmlEditorInputProps> = ({
           source={source}
           label={false}
           fullWidth
-          toolbar={
-            <RichTextInputToolbar size="small">
-              <LevelSelect size="small" />
-              <FormatButtons size="small" />
-              <ListButtons size="small" />
-              <LinkButtons size="small" />
-              <ImageButtons size="small" />
-              <QuoteButtons size="small" />
-              <ClearButtons size="small" />
-            </RichTextInputToolbar>
-          }
+          toolbar={<ArticleToolbar />}
           helperText="Markup the visual editor doesn't support is dropped once you edit here — use HTML for it."
-          sx={{ '& .ProseMirror': { minHeight: 320 } }}
+          sx={{
+            // One bordered box: toolbar strip on top, roomy writing area below
+            '& .RaRichTextInput-editorContent': {
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              overflow: 'hidden',
+            },
+            '& .ProseMirror': {
+              minHeight: 360,
+              px: 2,
+              py: 1.5,
+              outline: 'none',
+              lineHeight: 1.65,
+              '& h2': { fontSize: '1.375rem', mt: 3, mb: 1 },
+              '& h3': { fontSize: '1.125rem', mt: 2.5, mb: 0.75 },
+              '& blockquote': {
+                borderLeft: 3,
+                borderColor: 'primary.main',
+                pl: 2,
+                ml: 0,
+                color: 'text.secondary',
+              },
+              '& pre': { bgcolor: 'action.hover', p: 1.5, borderRadius: 1, overflowX: 'auto' },
+              '& img': { maxWidth: '100%', height: 'auto' },
+            },
+          }}
         />
       ) : (
         <TextInput

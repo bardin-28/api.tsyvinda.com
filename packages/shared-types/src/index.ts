@@ -3,3 +3,6 @@ export * from './dashboard';
 export * from './errors';
 export * from './lists';
 export * from './posts';
+export * from './users';
+export * from './site-settings';
+export * from './locales';

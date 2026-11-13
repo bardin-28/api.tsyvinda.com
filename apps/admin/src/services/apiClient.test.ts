@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { setContentLocale } from '../lib/contentLocale';
 import { HttpError } from 'react-admin';
 import { ApiError, apiClient, toHttpError } from './apiClient';
 import { getUser, setUser } from '../auth/sessionStore';
@@ -55,10 +56,23 @@ describe('apiClient requests', () => {
 
     const [, jsonInit] = fetchMock.mock.calls[0]!;
     expect(jsonInit.body).toBe('{"title":"x"}');
-    expect(jsonInit.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(jsonInit.headers).toEqual({
+      'Content-Type': 'application/json',
+      'x-content-locale': 'en',
+    });
     const [, formInit] = fetchMock.mock.calls[1]!;
     expect(formInit.body).toBe(form);
-    expect(formInit.headers).toBeUndefined();
+    // No Content-Type: fetch sets the multipart boundary itself
+    expect(formInit.headers).toEqual({ 'x-content-locale': 'en' });
+  });
+
+  it('sends the chosen content language with every request', async () => {
+    apiHandler.mockResolvedValue(respond(200, []));
+    setContentLocale('uk');
+    await apiClient.get('/posts');
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init.headers).toEqual({ 'x-content-locale': 'uk' });
+    setContentLocale('en');
   });
 
   it('resolves empty bodies (204) with undefined data', async () => {

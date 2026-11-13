@@ -22,7 +22,6 @@ export class AdminDashboardService {
     const [
       usersTotal,
       admins,
-      pendingApproval,
       unverified,
       usersLast7,
       usersLast30,
@@ -33,7 +32,6 @@ export class AdminDashboardService {
     ] = await Promise.all([
       this.users.count(),
       this.users.count({ where: { role: Role.ADMIN } }),
-      this.users.count({ where: { emailVerified: true, approvedByAdmin: false } }),
       this.users.count({ where: { emailVerified: false } }),
       this.users.count({ where: { createdAt: since7 } }),
       this.users.count({ where: { createdAt: since30 } }),
@@ -47,7 +45,6 @@ export class AdminDashboardService {
           lastName: true,
           email: true,
           emailVerified: true,
-          approvedByAdmin: true,
           createdAt: true,
         },
         order: { createdAt: 'DESC' },
@@ -59,7 +56,6 @@ export class AdminDashboardService {
       users: {
         total: usersTotal,
         admins,
-        pendingApproval,
         unverified,
         newLast7Days: usersLast7,
         newLast30Days: usersLast30,
@@ -71,7 +67,6 @@ export class AdminDashboardService {
         lastName: user.lastName,
         email: user.email,
         emailVerified: user.emailVerified,
-        approvedByAdmin: user.approvedByAdmin,
         createdAt: user.createdAt.toISOString(),
       })),
     };

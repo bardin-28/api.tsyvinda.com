@@ -287,7 +287,6 @@ async function seedUserWithPassword(
     passwordHash,
     profileImageUrl: null,
     emailVerified: true,
-    approvedByAdmin: false,
     role: Role.USER,
     ...overrides,
   } as User;

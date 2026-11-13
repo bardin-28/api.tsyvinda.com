@@ -6,7 +6,6 @@ import {
   Box,
   Card,
   CardContent,
-  Chip,
   Skeleton,
   Table,
   TableBody,
@@ -19,6 +18,9 @@ import {
 import type { DashboardRecentUser, DashboardStats } from '@tsyvinda/shared-types';
 import type { AdminDataProvider } from '../providers/dataProvider';
 import { tabularNums } from '../theme';
+import { TruncatedText } from '../components/TruncatedText';
+import { EmptyState } from '../components/EmptyState';
+import { PersonAddAlt } from '@mui/icons-material';
 
 export const DASHBOARD_QUERY_KEY = ['admin', 'dashboard'] as const;
 
@@ -30,11 +32,6 @@ interface Kpi {
 
 const KPIS: Kpi[] = [
   { label: 'Users', value: (s) => s.users.total },
-  {
-    label: 'Pending approval',
-    value: (s) => s.users.pendingApproval,
-    hint: 'Verified, not yet approved',
-  },
   { label: 'Unverified email', value: (s) => s.users.unverified },
   { label: 'New users · 7 days', value: (s) => s.users.newLast7Days },
   { label: 'New users · 30 days', value: (s) => s.users.newLast30Days },
@@ -69,12 +66,6 @@ const KpiTile: React.FC<{ kpi: Kpi; stats?: DashboardStats }> = ({ kpi, stats })
   </Card>
 );
 
-const UserStatus: React.FC<{ user: DashboardRecentUser }> = ({ user }) => {
-  if (!user.emailVerified) return <Chip size="small" color="warning" label="Unverified" />;
-  if (!user.approvedByAdmin) return <Chip size="small" color="info" label="Pending approval" />;
-  return <Chip size="small" color="success" label="Approved" />;
-};
-
 const RecentUsers: React.FC<{ users: DashboardRecentUser[] }> = ({ users }) => (
   <Card>
     <CardContent sx={{ pb: 0 }}>
@@ -83,11 +74,12 @@ const RecentUsers: React.FC<{ users: DashboardRecentUser[] }> = ({ users }) => (
       </Typography>
     </CardContent>
     {users.length === 0 ? (
-      <CardContent>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          No users yet.
-        </Typography>
-      </CardContent>
+      <EmptyState
+        compact
+        icon={PersonAddAlt}
+        title="No users yet"
+        subtitle="New sign-ups from the website show up here."
+      />
     ) : (
       <TableContainer>
         <Table size="small" aria-label="Latest signups">
@@ -95,17 +87,17 @@ const RecentUsers: React.FC<{ users: DashboardRecentUser[] }> = ({ users }) => (
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Status</TableCell>
               <TableCell>Signed up</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{`${user.firstName} ${user.lastName}`.trim()}</TableCell>
-                <TableCell>{user.email}</TableCell>
                 <TableCell>
-                  <UserStatus user={user} />
+                  <TruncatedText text={`${user.firstName} ${user.lastName}`.trim()} />
+                </TableCell>
+                <TableCell>
+                  <TruncatedText text={user.email} />
                 </TableCell>
                 <TableCell>{dateFormat.format(new Date(user.createdAt))}</TableCell>
               </TableRow>

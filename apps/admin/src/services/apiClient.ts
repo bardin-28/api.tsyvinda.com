@@ -1,6 +1,8 @@
 import { HttpError } from 'react-admin';
 import type { ApiErrorBody } from '@tsyvinda/shared-types';
+import { CONTENT_LOCALE_HEADER } from '@tsyvinda/shared-types';
 import { clearSession } from '../auth/sessionStore';
+import { getContentLocale } from '../lib/contentLocale';
 
 export const AUTH_LOGIN_PATH = '/auth/login';
 export const AUTH_REFRESH_PATH = '/auth/refresh';
@@ -65,12 +67,14 @@ async function send<T>(
   body: unknown,
   options: RequestOptions | undefined,
 ): Promise<ApiResponse<T>> {
-  const init: RequestInit = { method, credentials: 'include' };
+  // Every call carries the content language; endpoints without translated fields ignore it.
+  const headers: Record<string, string> = { [CONTENT_LOCALE_HEADER]: getContentLocale() };
+  const init: RequestInit = { method, credentials: 'include', headers };
   if (body instanceof FormData) {
     init.body = body;
   } else if (body !== undefined) {
     init.body = JSON.stringify(body);
-    init.headers = { 'Content-Type': 'application/json' };
+    headers['Content-Type'] = 'application/json';
   }
 
   let res: Response;

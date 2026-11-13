@@ -1,12 +1,5 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { PrimaryUuidV7Column } from '../../../db/primary-uuid-v7';
 import { User } from '../../users/entities/user.entity';
 
 export type AuthProvider = 'local' | 'google';
@@ -14,7 +7,7 @@ export type AuthProvider = 'local' | 'google';
 @Entity('user_identities')
 @Index('user_identities_provider_uq', ['provider', 'providerUserId'], { unique: true })
 export class UserIdentity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryUuidV7Column()
   id: string;
 
   @Column({ type: 'uuid' })

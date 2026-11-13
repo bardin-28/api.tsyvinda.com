@@ -7,11 +7,13 @@ import { brand, neutral, semantic } from './tokens';
 export const lightTheme: RaThemeOptions = deepMerge(deepMerge(defaultLightTheme, baseTheme), {
   palette: {
     mode: 'light',
+    // One orange (the website's) for fills, text and borders; text on orange fills is navy.
     primary: {
       light: brand[400],
       main: brand[500],
-      dark: brand[600],
-      contrastText: '#FFFFFF',
+      // Hover lightens instead of darkening: one orange, no dark shades
+      dark: brand[400],
+      contrastText: neutral[900],
     },
     secondary: {
       light: neutral[500],

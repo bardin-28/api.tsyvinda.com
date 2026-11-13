@@ -12,7 +12,6 @@ const admin: User = {
   role: Role.ADMIN,
   profileImageUrl: null,
   emailVerified: true,
-  approvedByAdmin: true,
   createdAt: '2020-01-01T00:00:00.000Z',
 };
 

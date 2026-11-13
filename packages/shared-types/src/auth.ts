@@ -12,7 +12,6 @@ export interface User {
   role: Role;
   profileImageUrl: string | null;
   emailVerified: boolean;
-  approvedByAdmin: boolean;
   createdAt: string;
 }
 

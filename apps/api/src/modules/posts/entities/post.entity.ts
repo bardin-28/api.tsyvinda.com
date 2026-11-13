@@ -5,32 +5,31 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
-  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { PrimaryUuidV7Column } from '../../../db/primary-uuid-v7';
+import { POST_STATUSES, type PostStatus } from '@tsyvinda/shared-types';
 import { User } from '../../users/entities/user.entity';
 
+/** Shared part of a post; its text, cover and SEO live in PostTranslation, one per language. */
 @Entity('posts')
 @Index('posts_created_id_idx', ['createdAt', 'id'])
+// Public blog: published posts, newest "date shown" first
+@Index('posts_status_published_id_idx', ['status', 'publishedAt', 'id'])
 export class Post {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryUuidV7Column()
   id: string;
-
-  @Column({ type: 'varchar', length: 200 })
-  title: string;
 
   @Index('posts_slug_uniq', { unique: true })
   @Column({ type: 'varchar', length: 200 })
   slug: string;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
-  description: string | null;
+  @Column({ type: 'enum', enum: POST_STATUSES, enumName: 'post_status', default: 'draft' })
+  status: PostStatus;
 
-  @Column({ type: 'text' })
-  htmlContent: string;
-
-  @Column({ type: 'varchar', length: 1024, nullable: true })
-  imageUrl: string | null;
+  /** "Date shown" on the website; set on first publish, editable by admins */
+  @Column({ type: 'timestamptz', nullable: true })
+  publishedAt: Date | null;
 
   @Index('posts_author_id_idx')
   @Column({ type: 'uuid' })

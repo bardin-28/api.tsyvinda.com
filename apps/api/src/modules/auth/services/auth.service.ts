@@ -31,7 +31,6 @@ export interface PublicUser {
   role: Role;
   profileImageUrl: string | null;
   emailVerified: boolean;
-  approvedByAdmin: boolean;
   createdAt: Date;
 }
 
@@ -364,7 +363,6 @@ export function toPublicUser(user: User): PublicUser {
     role: user.role,
     profileImageUrl: user.profileImageUrl,
     emailVerified: user.emailVerified,
-    approvedByAdmin: user.approvedByAdmin,
     createdAt: user.createdAt,
   };
 }
