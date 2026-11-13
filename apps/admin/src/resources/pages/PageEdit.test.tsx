@@ -26,7 +26,6 @@ const page: AdminPage = {
     title: text('Contacts', 'Контакти'),
     seo: {
       title: text('Contacts', 'Контакти'),
-      socialTitle: text(''),
       description: text('Reach me', 'Пишіть'),
       keywords: text(''),
       ogImageUrl: null,
@@ -122,7 +121,7 @@ describe('PageEdit', () => {
     await userEvent.type(screen.getByDisplayValue('Reach me'), ' anytime');
     expect(screen.getByText('16 characters, recommended: 70–160')).toBeInTheDocument();
     // Social image is an upload with crop, not a URL field
-    expect(screen.getByRole('group', { name: 'Social sharing image' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'OG image' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Choose image' })).toBeInTheDocument();
   });
 
@@ -155,5 +154,18 @@ describe('PageEdit', () => {
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
     await waitFor(() => expect(update).toHaveBeenCalled());
     expect(await screen.findByText('Required')).toBeInTheDocument();
+  });
+
+  it('waits for the full page instead of crashing on a list-row placeholder', async () => {
+    // After a language switch react-admin can render the list row (no draft, slugs) first
+    const { draft: _draft, slugs: _slugs, oldSlugs: _old, ...listRow } = page;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderEdit({ getOne: vi.fn().mockResolvedValue({ data: listRow }) });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+    expect(consoleError).not.toHaveBeenCalledWith(expect.stringContaining('AddressCard'));
+    consoleError.mockRestore();
   });
 });

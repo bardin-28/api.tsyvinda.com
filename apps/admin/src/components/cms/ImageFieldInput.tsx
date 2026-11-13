@@ -1,10 +1,11 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { useDataProvider, useInput, useNotify } from 'react-admin';
 import { Box, Button, CircularProgress, FormHelperText, Stack, Typography } from '@mui/material';
-import { Crop, DeleteOutlined, FileUpload, ImageOutlined } from '@mui/icons-material';
+import { Crop, DeleteOutlined, FileUpload, ImageOutlined, PermMedia } from '@mui/icons-material';
 import type { ImageCropOptions } from '@tsyvinda/shared-types';
 import type { AdminDataProvider } from '../../providers/dataProvider';
 import { ImageCropDialog } from './ImageCropDialog';
+import { MediaPickerDialog } from '../media/MediaPickerDialog';
 
 /** Types and size the API's upload accepts (shared/upload-options.ts). */
 const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp';
@@ -44,6 +45,7 @@ export const ImageFieldInput: React.FC<ImageFieldInputProps> = ({
   /** What the crop dialog shows: a picked file's object URL or the stored image; null = closed */
   const [cropSource, setCropSource] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   // Object URLs of picked files are freed when the dialog moves on
   useEffect(
@@ -147,6 +149,15 @@ export const ImageFieldInput: React.FC<ImageFieldInputProps> = ({
           >
             {url ? 'Replace' : 'Choose image'}
           </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<PermMedia />}
+            disabled={isUploading}
+            onClick={() => setIsLibraryOpen(true)}
+          >
+            Media library
+          </Button>
           {url && crop && (
             <Button
               size="small"
@@ -193,6 +204,15 @@ export const ImageFieldInput: React.FC<ImageFieldInputProps> = ({
           {fieldState.error?.message ?? helperText}
         </FormHelperText>
       )}
+      <MediaPickerDialog
+        open={isLibraryOpen}
+        label={label}
+        onClose={() => setIsLibraryOpen(false)}
+        onSelect={(media) => {
+          field.onChange(media.url);
+          setIsLibraryOpen(false);
+        }}
+      />
       {crop && (
         <ImageCropDialog
           open={cropSource !== null}

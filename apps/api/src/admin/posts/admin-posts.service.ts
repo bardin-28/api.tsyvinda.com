@@ -12,7 +12,7 @@ import {
   type SortOrder,
 } from '@tsyvinda/shared-types';
 import { HttpError } from '../../shared/http-error';
-import { S3Service } from '../../shared/s3/s3.service';
+import { MediaService } from '../../modules/media/media.service';
 import { RevalidationService } from '../../modules/cms/services/revalidation.service';
 import { User } from '../../modules/users/entities/user.entity';
 import { Post } from '../../modules/posts/entities/post.entity';
@@ -102,7 +102,7 @@ type PostRow = Post & {
 export class AdminPostsService {
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
-    private readonly s3: S3Service,
+    private readonly media: MediaService,
     private readonly revalidation: RevalidationService,
   ) {}
 
@@ -353,15 +353,9 @@ export class AdminPostsService {
     );
   }
 
-  /** Removes stored images that no language version of any post points to any more. */
+  /** Removes images nothing uses any more (other posts, avatars and pages included). */
   private async deleteUnusedImages(urls: (string | null | undefined)[]): Promise<void> {
-    const candidates = [...new Set(urls.filter((url): url is string => Boolean(url)))];
-    for (const url of candidates) {
-      const stillUsed = await this.translations.exists({
-        where: [{ imageUrl: url }, { ogImageUrl: url }],
-      });
-      if (!stillUsed) void this.s3.deleteByUrl(url);
-    }
+    await this.media.deleteIfUnused(urls);
   }
 
   private async assertSlugFree(slug: string, ownId?: string): Promise<void> {

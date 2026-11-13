@@ -22,11 +22,10 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { uuidv7 } from '../../shared/uuid-v7';
 import { ErrorDto } from '../../shared/swagger/error.dto';
 import { HttpError } from '../../shared/http-error';
-import { S3Service } from '../../shared/s3/s3.service';
-import { extForMime, imageUploadMemoryOptions } from '../../shared/upload-options';
+import { MediaService } from '../../modules/media/media.service';
+import { imageUploadMemoryOptions } from '../../shared/upload-options';
 import { CurrentUser, type AuthUser } from '../../modules/auth/decorators/current-user.decorator';
 import { ADMIN_ACCESS_COOKIE_NAME } from '../../modules/auth/shared/auth.utils';
 import { AdminGuard } from '../guards/admin.guard';
@@ -48,7 +47,7 @@ import { AdminUsersService } from './admin-users.service';
 export class AdminUsersController {
   constructor(
     private readonly users: AdminUsersService,
-    private readonly s3: S3Service,
+    private readonly media: MediaService,
   ) {}
 
   @Get()
@@ -91,19 +90,16 @@ export class AdminUsersController {
     @Body() dto: AdminUpdateUserDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    if (dto.role === undefined && !dto.removeImage && !file) {
+    if (dto.role === undefined && !dto.removeImage && !dto.profileImageUrl && !file) {
       throw new HttpError(400, 'VALIDATION_FAILED', 'At least one field is required');
     }
-    // Same storage layout as the website's own profile upload
-    const profileImageUrl = file
-      ? await this.s3.put(
-          `profile/${uuidv7()}.${extForMime(file.mimetype)}`,
-          file.buffer,
-          file.mimetype,
-        )
-      : dto.removeImage
-        ? null
-        : undefined;
+    // Same storage layout as the website's own profile upload; joins the media library
+    let profileImageUrl: string | null | undefined;
+    if (file) profileImageUrl = await this.media.storeUrl(file, 'profile', actor.id);
+    else if (dto.profileImageUrl) {
+      await this.media.assertInLibrary(dto.profileImageUrl, 'profileImageUrl');
+      profileImageUrl = dto.profileImageUrl;
+    } else if (dto.removeImage) profileImageUrl = null;
     return this.users.update(actor.id, id, { role: dto.role, profileImageUrl });
   }
 

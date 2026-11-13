@@ -4,7 +4,7 @@ import { Role } from '@tsyvinda/shared-types';
 import { AdminUsersService } from './admin-users.service';
 import { User } from '../../modules/users/entities/user.entity';
 import { Post } from '../../modules/posts/entities/post.entity';
-import type { S3Service } from '../../shared/s3/s3.service';
+import type { MediaService } from '../../modules/media/media.service';
 import { HttpError } from '../../shared/http-error';
 
 const makeUser = (over: Partial<User> = {}): User =>
@@ -72,7 +72,12 @@ beforeEach(() => {
   const ds = {
     getRepository: (entity: EntityTarget<unknown>) => (entity === User ? users : posts),
   } as unknown as DataSource;
-  service = new AdminUsersService(ds, s3 as unknown as S3Service);
+  service = new AdminUsersService(ds, {
+    deleteIfUnused: async (urls: (string | null | undefined)[]) => {
+      for (const url of urls)
+        if (url) await (s3.deleteByUrl as unknown as (u: string) => Promise<void>)(url);
+    },
+  } as unknown as MediaService);
 });
 
 const expectHttpError = async (promise: Promise<unknown>, status: number, code: string) => {

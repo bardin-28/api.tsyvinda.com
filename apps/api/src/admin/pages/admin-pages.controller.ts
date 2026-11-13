@@ -85,9 +85,9 @@ export class AdminPagesController {
   @ApiOkResponse({ type: PageImageUploadDto })
   @ApiResponse({ status: 400, description: 'INVALID_FILE_TYPE or no file', type: ErrorDto })
   @ApiResponse({ status: 413, description: 'File too large', type: ErrorDto })
-  upload(@UploadedFile() file?: Express.Multer.File) {
+  upload(@CurrentUser() user: AuthUser, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new HttpError(400, 'FILE_REQUIRED', 'Choose an image to upload');
-    return this.pages.uploadImage(file);
+    return this.pages.uploadImage(file, user.id);
   }
 
   @Get(':key')

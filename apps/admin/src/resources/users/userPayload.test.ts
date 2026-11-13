@@ -35,4 +35,13 @@ describe('toUserPayload', () => {
       toUserPayload({ role: Role.USER, profileImageUrl: null }, { profileImageUrl: null }),
     ).toEqual({ role: Role.USER });
   });
+
+  it('sends an avatar picked from the media library as its URL', () => {
+    expect(
+      toUserPayload(
+        { role: Role.USER, profileImageUrl: 'https://cdn.test/media/new.webp' },
+        { profileImageUrl: 'https://cdn.test/profile/a.jpg' },
+      ),
+    ).toEqual({ role: Role.USER, profileImageUrl: 'https://cdn.test/media/new.webp' });
+  });
 });

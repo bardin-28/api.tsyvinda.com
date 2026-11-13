@@ -7,6 +7,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   Max,
   MaxLength,
   Min,
@@ -85,6 +86,15 @@ export class AdminUpdateUserDto {
 
   @ApiImageFile()
   image?: Express.Multer.File;
+
+  @ApiPropertyOptional({
+    maxLength: 1024,
+    description: 'Avatar from the media library (its URL); ignored when a new image is sent',
+  })
+  @IsOptional()
+  @IsUrl({ protocols: ['https', 'http'], require_protocol: true, require_tld: false })
+  @MaxLength(1024)
+  profileImageUrl?: string;
 }
 
 export class AdminUserDto extends UserDto {

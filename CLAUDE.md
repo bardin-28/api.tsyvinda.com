@@ -123,7 +123,10 @@ Plan/report: `docs/plans/cms-pages.md`, `docs/reports/cms-pages.md`. Port of the
   them in, never add/remove/reorder) and `BLOCK_DEFINITIONS` (field trees; a `group` field nests a sub-object,
   e.g. `data.experience.roles`; an `image` field stores an uploaded file's URL, e.g. the hero `avatar`, with optional
   `crop` {aspect, outputWidth, shape}; a text's optional `recommendedLength` drives the admin's "N characters,
-  recommended: a–b" hint, used for SEO title/description). No shared content: each page keeps its own copy. The API validates content with
+  recommended: a–b" hint, used for the OG title/description). Page SEO is one OpenGraph set: `seo.title` (OG title = `og:title`
+  and `<title>`, the website appends " — <site name>" except on Home), `seo.description` (OG description = `og:description`
+  and meta description), `seo.ogImageUrl` (OG image), keywords, noindex — no separate social title (the public API still sends a
+  deprecated `socialTitle` = title for older websites). No shared content: each page keeps its own copy. The API validates content with
   them (`normalizePageContent` always returns exactly the page's sections, matched by position + type), the admin
   renders forms from them (`components/cms/FieldInput.tsx`), the seed uses them. **New section** = block
   definition + page's `sections` + seed + the website's zod schema and view. **New page** = definition +
@@ -138,11 +141,11 @@ Plan/report: `docs/plans/cms-pages.md`, `docs/reports/cms-pages.md`. Port of the
   revision + publish in one transaction), 409 `VERSION_CONFLICT`, 400 `VALIDATION_FAILED` with `fieldErrors` paths
   like `draft.blocks.0.data.title.en` for empty required fields, `SLUG_MISSING`; PUT slugs — live, no version; no
   publish/unpublish endpoints; `POST /admin/pages/uploads` (multipart `image`) → `{ url }` in S3 `pages/` —
-  the editor uploads on pick, and a save deletes `pages/` images the content no longer shows), `src/admin/redirects` (no loops/chains). Admin app: Pages top-level under
+  the editor uploads on pick (the file joins the media library), and a save deletes images the content no longer shows when nothing else uses them), `src/admin/redirects` (no loops/chains). Admin app: Pages top-level under
   "Management", Redirects under Settings; page editor = Content/SEO tabs, numbered accordion per fixed section; image fields
   (`components/cms/ImageFieldInput.tsx`) open `ImageCropDialog` (canvas, no package; math in `lib/imageCrop.ts`)
   on pick and upload the crop as webp; re-cropping a stored image needs CORS on the image host for the admin
-  origin. The SEO share image (`seo.ogImageUrl`) is such an upload, cropped to 1200×630.
+  origin. The OG image (`seo.ogImageUrl`) is such an upload, cropped to 1200×630.
 - `CmsSeedService` (boot): inserts missing pages, live, never overwrites.
 - `RevalidationService`: POSTs cache tags to `WEBSITE_REVALIDATE_URL` (bearer `WEBSITE_REVALIDATE_SECRET`, both
   optional) after CMS and post changes; tags: `page:<key>`, `routes`, `posts`, `post:<slug>`.
@@ -179,7 +182,7 @@ throws on missing/invalid env. No `@nestjs/config` — failing fast on boot is t
 - **Auth**: `@UseGuards(AuthGuard)` (reads `access` cookie, verifies JWT); read the user with `@CurrentUser()`. There is no admin approval of website accounts (removed; `users.approvedByAdmin` dropped).
 - **Admin surface** (`src/admin/`): controllers live only there and are listed in `ADMIN_API_MODULES` (route prefix `/admin` + the `/docs-admin` Swagger doc). Every admin controller carries `@UseGuards(AdminOriginGuard)`; every non-auth handler also `AdminGuard`. Sessions are separated by **surface**: access JWTs carry `surface: 'website' | 'admin'` (missing = website), `refresh_tokens.surface` stops cross-surface rotation, admin cookies are `admin_access` / `admin_refresh` (host-only, `Path=/admin`). Admin login = `AuthService.login({ surface: 'admin' })`, rejects non-`ADMIN` users with the same 401 as a bad password. `AdminGuard` re-reads `users.role` per request (demotion is immediate). `AdminOriginGuard` rejects cookie writes whose `Origin` isn't `https://ADMIN_HOST` or the API host (CSRF). `ADMIN_DEFAULT_EMAIL`/`PASSWORD` creates (or promotes) the default admin on boot, never overwrites a password.
 - **Rate limit**: `@nestjs/throttler` + `@nest-lab/throttler-storage-redis`. Global default 100/60s via `ThrottlerGuard`; per-route overrides with `@Throttle({ default: { limit, ttl } })`. Admin login: 5/min per IP then a 15-min IP block (`blockDuration`), plus `AdminLoginLockoutService` (10 failed logins per email → 429 `LOGIN_LOCKED` for 15 min, counter reset on success).
-- **File upload**: `FileInterceptor('image', imageUploadMemoryOptions())` (multer **memoryStorage** in `src/shared/upload-options.ts`). The handler streams `file.buffer` to `S3Service.put(key, buffer, mime)` (`posts/<uuid>.<ext>` / `profile/<uuid>.<ext>`) and stores the returned public URL. Old objects are removed via `S3Service.deleteByUrl` in the service layer (no disk, no `CleanupUploadInterceptor`). Local = MiniStack, prod = AWS S3 (see `src/shared/s3/`).
+- **File upload**: `FileInterceptor('image', imageUploadMemoryOptions())` (multer **memoryStorage** in `src/shared/upload-options.ts`). Every image goes through the **media library** (`src/modules/media/`, global `MediaService`): `media.store/storeUrl(file, folder, userId)` puts it in S3 (`posts/`, `posts/og/`, `profile/`, `pages/`, `media/` + `<uuid>.<ext>`) and registers a `media` row (url, fileName, mimeType, size, uploader). **Never call `S3Service.put`/`deleteByUrl` from features** — replaced/removed images go to `media.deleteIfUnused(urls)`, which deletes file + row only when no post version (cover/OG), avatar or page content (`pages.draft` text) still uses the URL: images can be reused anywhere, so per-feature checks are not enough. Posts (`imageUrl`/`ogImageUrl`) and admin users (`profileImageUrl`) also accept a library URL instead of a file (`media.assertInLibrary`, 400 otherwise). `MediaImportService` registers images content already uses on every boot (idempotent, HEAD for size). Admin API: `GET/POST /admin/media`, `GET/DELETE /admin/media/:id` (409 `MEDIA_IN_USE` with `details.usages`). Admin app: "Media" menu (grid, search, upload, usage chips, delete when unused) and a "Media library" picker (`components/media/MediaPickerDialog.tsx`) on every image field — `SingleImageInput` (post cover/OG, avatar; optional `crop`) and the CMS `ImageFieldInput`. Local = MiniStack, prod = AWS S3 (see `src/shared/s3/`).
 - **Turnstile**: `TurnstileInterceptor`. On multipart routes it MUST be listed **after** `FileInterceptor` (multer populates `req.body` in its interceptor phase, which runs after guards).
 
 ## Code Style

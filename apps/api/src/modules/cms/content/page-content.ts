@@ -30,13 +30,12 @@ export const PAGE_META_FIELDS = {
 } as const satisfies FieldDefinitions;
 
 export const PAGE_SEO_FIELDS = {
-  title: { kind: 'text', localized: true, label: 'SEO title', required: true, max: 120 },
-  socialTitle: { kind: 'text', localized: true, label: 'Social title', max: 160 },
+  title: { kind: 'text', localized: true, label: 'OG title', required: true, max: 120 },
   description: {
     kind: 'text',
     localized: true,
     multiline: true,
-    label: 'Description',
+    label: 'OG description',
     required: true,
     max: 400,
   },
@@ -108,7 +107,6 @@ export function normalizePageContent(key: PageKey, raw: unknown): PageContent {
     title: meta.title as PageContent['title'],
     seo: {
       title: seoTexts.title as PageContent['seo']['title'],
-      socialTitle: seoTexts.socialTitle as PageContent['seo']['socialTitle'],
       description: seoTexts.description as PageContent['seo']['description'],
       keywords: seoTexts.keywords as PageContent['seo']['keywords'],
       ogImageUrl,
@@ -186,7 +184,6 @@ export function emptyPageContent(): PageContent {
     title: { ...empty },
     seo: {
       title: { ...empty },
-      socialTitle: { ...empty },
       description: { ...empty },
       keywords: { ...empty },
       ogImageUrl: null,

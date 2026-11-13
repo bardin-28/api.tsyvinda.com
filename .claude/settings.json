@@ -81,5 +81,5 @@
   "sandbox": {
     "enabled": true
   },
-  "additionalDirectories": ["../fe", "../infra", "../../DL"]
+  "additionalDirectories": ["../fe", "../infra"]
 }

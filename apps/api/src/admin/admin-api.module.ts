@@ -8,6 +8,7 @@ import { AdminCategoriesModule } from './categories/admin-categories.module';
 import { AdminSettingsModule } from './settings/admin-settings.module';
 import { AdminPagesModule } from './pages/admin-pages.module';
 import { AdminRedirectsModule } from './redirects/admin-redirects.module';
+import { AdminMediaModule } from './media/admin-media.module';
 
 // One list drives both the /admin route prefix and the admin Swagger document (/docs-admin).
 export const ADMIN_API_MODULES = [
@@ -19,6 +20,7 @@ export const ADMIN_API_MODULES = [
   AdminSettingsModule,
   AdminPagesModule,
   AdminRedirectsModule,
+  AdminMediaModule,
 ];
 
 export const ADMIN_ROUTE_PREFIX = 'admin';

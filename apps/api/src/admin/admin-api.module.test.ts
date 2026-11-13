@@ -12,6 +12,11 @@ import { AdminUsersService } from './users/admin-users.service';
 import { AdminCategoriesService } from './categories/admin-categories.service';
 import { SiteSettingsService } from '../modules/site-settings/site-settings.service';
 import { S3Module } from '../shared/s3/s3.module';
+import { MediaModule } from '../modules/media/media.module';
+import { MediaService } from '../modules/media/media.service';
+import { MediaImportService } from '../modules/media/media.module';
+import { Media } from '../modules/media/entities/media.entity';
+import { PostTranslation } from '../modules/posts/entities/post-translation.entity';
 import { S3Service } from '../shared/s3/s3.service';
 import { AuthService } from '../modules/auth/services/auth.service';
 import { User } from '../modules/users/entities/user.entity';
@@ -34,7 +39,7 @@ import { Redirect } from '../modules/cms/entities/redirect.entity';
 let app: NestExpressApplication;
 
 beforeAll(async () => {
-  let builder = Test.createTestingModule({ imports: [AdminApiModule, S3Module] })
+  let builder = Test.createTestingModule({ imports: [AdminApiModule, S3Module, MediaModule] })
     .overrideProvider(getDataSourceToken())
     .useValue({})
     .overrideProvider(AuthService)
@@ -54,6 +59,10 @@ beforeAll(async () => {
     .overrideProvider(S3Service)
     .useValue({})
     .overrideProvider(CmsSeedService)
+    .useValue({})
+    .overrideProvider(MediaService)
+    .useValue({})
+    .overrideProvider(MediaImportService)
     .useValue({});
   for (const service of [RoutesService, WebsiteContentService, PagesService, RedirectsService]) {
     builder = builder.overrideProvider(service).useValue({});
@@ -68,6 +77,8 @@ beforeAll(async () => {
     Page,
     PageRevision,
     PageSlug,
+    Media,
+    PostTranslation,
     Redirect,
   ]) {
     builder = builder.overrideProvider(getRepositoryToken(entity)).useValue({});
@@ -97,7 +108,7 @@ describe('AdminApiModule', () => {
     expect(categories.status).toBe(401);
     const settings = await request(app.getHttpServer()).get('/admin/settings');
     expect(settings.status).toBe(401);
-    for (const path of ['/admin/pages', '/admin/redirects']) {
+    for (const path of ['/admin/pages', '/admin/redirects', '/admin/media']) {
       expect((await request(app.getHttpServer()).get(path)).status).toBe(401);
     }
   });

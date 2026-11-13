@@ -161,15 +161,18 @@ export function localizePath(path: string, locale: Locale): string {
 
 // ── Content ─────────────────────────────────────────────────────────────────
 
+/**
+ * One set of texts for search engines and share cards (OpenGraph): the OG title is also the
+ * `<title>`, the OG description also the meta description.
+ */
 export interface PageSeoDraft {
-  /** `<title>`; the website adds " — <site name>" */
+  /** OG title: `og:title` and `<title>`; the website adds " — <site name>" (not on Home) */
   title: LocalizedText;
-  /** Social card title, usually "Page — Name" */
-  socialTitle: LocalizedText;
+  /** OG description: `og:description` and the meta description */
   description: LocalizedText;
   /** Comma-separated */
   keywords: LocalizedText;
-  /** Share image; the site's generated card when empty */
+  /** OG image (`og:image`); the site's generated card when empty */
   ogImageUrl: string | null;
   /** Keep this page out of search engines even while indexing is on */
   noindex: boolean;
@@ -185,6 +188,10 @@ export interface PageContent {
 
 export interface WebsiteSeo {
   title: string;
+  /**
+   * @deprecated Same as `title` (separate social titles were merged into the OG title). Kept so
+   * websites deployed before the merge keep working; remove once they are updated.
+   */
   socialTitle: string;
   description: string;
   keywords: string[];

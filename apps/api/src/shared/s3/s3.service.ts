@@ -1,4 +1,9 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
 import { config } from '../app.config';
 
@@ -34,6 +39,20 @@ export class S3Service implements OnApplicationShutdown {
       new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }),
     );
     return `${this.publicBase}/${key}`;
+  }
+
+  // Size and type of the object behind a stored public URL; null when it is not ours or missing.
+  async headByUrl(
+    url: string,
+  ): Promise<{ size: number | null; contentType: string | null } | null> {
+    const key = this.keyFromUrl(url);
+    if (!key) return null;
+    try {
+      const head = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      return { size: head.ContentLength ?? null, contentType: head.ContentType ?? null };
+    } catch {
+      return null;
+    }
   }
 
   // Deletes the object referenced by a stored public URL. No-op when the URL is

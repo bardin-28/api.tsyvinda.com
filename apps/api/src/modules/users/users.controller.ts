@@ -10,11 +10,10 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiCookieAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { uuidv7 } from '../../shared/uuid-v7';
 import { UserDto } from '../auth/dto/user.response';
 import { HttpError } from '../../shared/http-error';
-import { extForMime, imageUploadMemoryOptions } from '../../shared/upload-options';
-import { S3Service } from '../../shared/s3/s3.service';
+import { imageUploadMemoryOptions } from '../../shared/upload-options';
+import { MediaService } from '../media/media.service';
 import { TurnstileInterceptor } from '../../shared/turnstile/turnstile.interceptor';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/decorators/current-user.decorator';
@@ -28,7 +27,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 export class UsersController {
   constructor(
     private readonly profiles: ProfileService,
-    private readonly s3: S3Service,
+    private readonly media: MediaService,
   ) {}
 
   @Get()
@@ -54,13 +53,7 @@ export class UsersController {
       throw new HttpError(400, 'VALIDATION_FAILED', 'At least one field is required');
     }
 
-    const profileImageUrl = file
-      ? await this.s3.put(
-          `profile/${uuidv7()}.${extForMime(file.mimetype)}`,
-          file.buffer,
-          file.mimetype,
-        )
-      : undefined;
+    const profileImageUrl = file ? await this.media.storeUrl(file, 'profile', user.id) : undefined;
 
     return this.profiles.update(user.id, {
       firstName: dto.firstName,

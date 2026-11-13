@@ -4,6 +4,7 @@ import {
   AltRoute,
   Article,
   Feed,
+  PermMedia,
   Category,
   Description,
   ManageAccounts,
@@ -33,6 +34,7 @@ const CategoryCreate = lazy(() =>
 );
 const PageList = lazy(() => import('./pages/PageList').then((m) => ({ default: m.PageList })));
 const PageEdit = lazy(() => import('./pages/PageEdit').then((m) => ({ default: m.PageEdit })));
+const MediaList = lazy(() => import('./media/MediaList').then((m) => ({ default: m.MediaList })));
 const RedirectList = lazy(() =>
   import('./redirects/RedirectList').then((m) => ({ default: m.RedirectList })),
 );
@@ -102,6 +104,14 @@ export const ADMIN_RESOURCES: AdminResourceConfig[] = [
     roles: [Role.ADMIN],
     list: PageList,
     edit: PageEdit,
+  },
+  {
+    // Like WordPress' Media: every uploaded image, reusable from any image field
+    name: 'media',
+    label: 'Media',
+    icon: PermMedia,
+    roles: [Role.ADMIN],
+    list: MediaList,
   },
   {
     name: 'redirects',

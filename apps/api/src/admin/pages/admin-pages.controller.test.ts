@@ -86,6 +86,7 @@ describe('Admin pages', () => {
     expect(res.body).toEqual({ url: 'https://cdn.example/pages/a.png' });
     expect(pagesMock.uploadImage).toHaveBeenCalledWith(
       expect.objectContaining({ mimetype: 'image/png' }),
+      'admin-1',
     );
 
     const pdf = await request(app.getHttpServer())

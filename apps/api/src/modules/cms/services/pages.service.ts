@@ -20,9 +20,7 @@ import {
   type PageKey,
 } from '@tsyvinda/shared-types';
 import { HttpError } from '../../../shared/http-error';
-import { S3Service } from '../../../shared/s3/s3.service';
-import { extForMime } from '../../../shared/upload-options';
-import { uuidv7 } from '../../../shared/uuid-v7';
+import { MediaService } from '../../media/media.service';
 import { User } from '../../users/entities/user.entity';
 import { Page } from '../entities/page.entity';
 import { PageRevision } from '../entities/page-revision.entity';
@@ -73,13 +71,18 @@ export class PagesService {
     @InjectDataSource() private readonly ds: DataSource,
     private readonly routes: RoutesService,
     private readonly revalidation: RevalidationService,
-    private readonly s3: S3Service,
+    private readonly media: MediaService,
   ) {}
 
-  /** Stores an image picked in the page editor; the editor puts the URL into an image field. */
-  async uploadImage(file: { buffer: Buffer; mimetype: string }): Promise<{ url: string }> {
-    const key = `${PAGE_IMAGE_FOLDER}/${uuidv7()}.${extForMime(file.mimetype)}`;
-    return { url: await this.s3.put(key, file.buffer, file.mimetype) };
+  /**
+   * Stores an image picked in the page editor (it joins the media library); the editor puts
+   * the URL into an image field.
+   */
+  async uploadImage(
+    file: { buffer: Buffer; mimetype: string; originalname?: string; size?: number },
+    userId?: string,
+  ): Promise<{ url: string }> {
+    return { url: await this.media.storeUrl(file, PAGE_IMAGE_FOLDER, userId) };
   }
 
   async list(): Promise<AdminPageListItem[]> {
@@ -184,16 +187,13 @@ export class PagesService {
   }
 
   /**
-   * Removes images the page no longer shows from S3, once the save is committed. Only files the
-   * page editor uploaded (`pages/…`); best-effort (S3Service logs failures). Pages have no
+   * Deletes images the page no longer shows, once the save is committed — unless another page,
+   * post or avatar still uses them (the media library checks everywhere). Pages have no
    * history view, so older revisions don't keep their images.
    */
   private async deleteUnusedImages(previous: string[], current: string[]): Promise<void> {
     const kept = new Set(current);
-    const removed = [...new Set(previous)].filter(
-      (url) => !kept.has(url) && this.s3.keyFromUrl(url)?.startsWith(`${PAGE_IMAGE_FOLDER}/`),
-    );
-    await Promise.all(removed.map((url) => this.s3.deleteByUrl(url)));
+    await this.media.deleteIfUnused(previous.filter((url) => !kept.has(url)));
   }
 
   async updateSlugs(

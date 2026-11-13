@@ -3,7 +3,8 @@ import { BLOCK_TYPES, LOCALES, PAGE_KEYS, type Locale } from '@tsyvinda/shared-t
 
 export class WebsiteSeoDto {
   @ApiProperty() title: string;
-  @ApiProperty() socialTitle: string;
+  @ApiProperty({ deprecated: true, description: 'Same as title (kept for older websites)' })
+  socialTitle: string;
   @ApiProperty() description: string;
   @ApiProperty({ type: [String] }) keywords: string[];
   @ApiProperty({ nullable: true, type: String }) ogImageUrl: string | null;

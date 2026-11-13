@@ -8,7 +8,8 @@ import { AdminPostsController } from './admin-posts.controller';
 import { AdminPostsService } from './admin-posts.service';
 import { AdminGuard } from '../guards/admin.guard';
 import { AdminOriginGuard } from '../guards/admin-origin.guard';
-import { S3Service } from '../../shared/s3/s3.service';
+import { MediaService } from '../../modules/media/media.service';
+import { mediaMock } from '../../modules/media/media.test-utils';
 import { AllExceptionsFilter } from '../../shared/all-exceptions.filter';
 import { validationExceptionFactory } from '../../shared/validation-exception.factory';
 
@@ -39,7 +40,7 @@ beforeAll(async () => {
     controllers: [AdminPostsController],
     providers: [
       { provide: AdminPostsService, useValue: postsMock },
-      { provide: S3Service, useValue: s3Mock },
+      { provide: MediaService, useValue: mediaMock(s3Mock) },
     ],
   })
     .overrideGuard(AdminGuard)
@@ -195,6 +196,26 @@ describe('POST /admin/posts', () => {
         ogImageUrl: 'https://cdn.example/posts/new.png',
       }),
     );
+  });
+
+  it('uses cover and share images picked from the media library', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/admin/posts')
+      .send({
+        ...body,
+        imageUrl: 'https://cdn.example/media/cover.webp',
+        ogImageUrl: 'https://cdn.example/media/og.webp',
+      });
+    expect(res.status).toBe(201);
+    expect(postsMock.create).toHaveBeenCalledWith(
+      'admin-1',
+      'en',
+      expect.objectContaining({
+        imageUrl: 'https://cdn.example/media/cover.webp',
+        ogImageUrl: 'https://cdn.example/media/og.webp',
+      }),
+    );
+    expect(s3Mock.put).not.toHaveBeenCalled();
   });
 
   it('rejects invalid publishing/SEO values', async () => {

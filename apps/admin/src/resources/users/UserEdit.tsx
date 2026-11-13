@@ -50,6 +50,9 @@ const AvatarPreview: React.FC = () => {
   );
 };
 
+/** Avatars are round everywhere: square crop with a circle guide, 512 px (2× the largest use). */
+const AVATAR_CROP = { aspect: 1, outputWidth: 512, shape: 'circle' } as const;
+
 // Existing users carry the avatar as a URL string; ImageInput previews `{ src }`.
 const formatAvatar = (value: unknown) => (typeof value === 'string' ? { src: value } : value);
 
@@ -122,12 +125,14 @@ const UserFields: React.FC = () => {
           accept={{ 'image/jpeg': [], 'image/png': [], 'image/webp': [] }}
           maxSize={5 * 1024 * 1024}
           format={formatAvatar}
+          crop={AVATAR_CROP}
+          cropLabel="Avatar"
           placeholder={
             <Typography variant="body2" sx={{ color: 'text.secondary', py: 1 }}>
               Drop an image or click to upload
             </Typography>
           }
-          helperText="JPEG, PNG or WebP, up to 5 MB"
+          helperText="JPEG, PNG or WebP, up to 5 MB; cropped to a square (shown as a circle)"
           sx={{ maxWidth: 420, '& .RaFileInput-dropZone': { py: 1 } }}
         >
           <AvatarPreview />
