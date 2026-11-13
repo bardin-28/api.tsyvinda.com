@@ -255,10 +255,12 @@ const PageForm: React.FC = () => {
             Search engines and sharing (OpenGraph)
           </Typography>
           <FieldInputs defs={SEO_FIELDS} locale={locale} base="draft.seo" />
+          {/* key: a fresh input per language, so the preview never shows the other language's image */}
           <ImageFieldInput
-            source="draft.seo.ogImageUrl"
+            key={locale}
+            source={`draft.seo.ogImageUrl.${locale}`}
             label="OG image"
-            helperText="Share cards (og:image) on Facebook, LinkedIn, X…; cropped to 1200×630. The site’s generated card when empty"
+            helperText={`Share cards (og:image) on Facebook, LinkedIn, X…; cropped to 1200×630. In ${locale.toUpperCase()}; empty: the English image, else the site’s generated card`}
             crop={OG_IMAGE_CROP}
           />
           <BooleanInput

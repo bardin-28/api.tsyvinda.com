@@ -31,12 +31,19 @@ const history: Record<string, { key: string; locale: string; current: boolean }[
 };
 
 let redirectRow: unknown;
-let postLocales: { locale: string }[];
+/** Language versions of the published post "hello" (own slug null = the shared one) */
+let postVersions: { key: string; locale: string; slug: string | null }[];
 let service: RoutesService;
+
+/** Rows of the post lookup: the post owning the segment (shared or own slug), or none. */
+function postRows(segment: string) {
+  const owns = postVersions.some((version) => version.key === segment || version.slug === segment);
+  return owns ? postVersions : [];
+}
 
 beforeEach(() => {
   redirectRow = null;
-  postLocales = [{ locale: 'en' }];
+  postVersions = [{ key: 'hello', locale: 'en', slug: null }];
   const repos = new Map<unknown, object>([
     [Page, { find: vi.fn(async () => pages) }],
     [PageSlug, { find: vi.fn(async () => currentSlugs) }],
@@ -45,7 +52,9 @@ beforeEach(() => {
   const ds = {
     getRepository: (entity: unknown) => repos.get(entity),
     query: vi.fn(async (sql: string, params: string[]) =>
-      sql.includes('FROM posts') ? postLocales : (history[`${params[0]}|${params[1]}`] ?? []),
+      sql.includes('FROM posts')
+        ? postRows(params[0]!)
+        : (history[`${params[0]}|${params[1]}`] ?? []),
     ),
   };
   service = new RoutesService(ds as unknown as DataSource);
@@ -98,6 +107,34 @@ describe('RoutesService.resolve', () => {
       paths: { en: '/blog/hello' },
     });
     expect(await service.resolve('/notes/hello', 'en')).toEqual({
+      kind: 'redirect',
+      location: '/blog/hello',
+      permanent: true,
+    });
+  });
+
+  it("serves a language's own post slug and redirects the shared one there", async () => {
+    postVersions = [
+      { key: 'hello', locale: 'en', slug: null },
+      { key: 'hello', locale: 'uk', slug: 'pryvit' },
+    ];
+    const paths = { en: '/blog/hello', uk: '/blog/pryvit' };
+    expect(await service.resolve('/blog/pryvit', 'uk')).toEqual({
+      kind: 'post',
+      slug: 'hello',
+      paths,
+    });
+    expect(await service.resolve('/blog/hello', 'en')).toEqual({
+      kind: 'post',
+      slug: 'hello',
+      paths,
+    });
+    expect(await service.resolve('/blog/hello', 'uk')).toEqual({
+      kind: 'redirect',
+      location: '/uk/blog/pryvit',
+      permanent: true,
+    });
+    expect(await service.resolve('/blog/pryvit', 'en')).toEqual({
       kind: 'redirect',
       location: '/blog/hello',
       permanent: true,

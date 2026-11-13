@@ -290,6 +290,38 @@ describe('AdminPostsService.create', () => {
   });
 });
 
+describe('AdminPostsService.update — language URL and keywords', () => {
+  it("stores this language's own slug and keywords", async () => {
+    posts.findOne.mockResolvedValue(makePost());
+    translations.findOne.mockResolvedValue(makeTranslation({ locale: 'uk' }));
+    await service.update('p1', 'uk', { localizedSlug: 'pryvit', keywords: ['Next.js', 'API'] });
+    expect(translations.save).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: 'pryvit', keywords: ['Next.js', 'API'] }),
+    );
+  });
+
+  it('clears the own slug when it is empty or the shared one', async () => {
+    posts.findOne.mockResolvedValue(makePost());
+    translations.findOne.mockResolvedValue(makeTranslation({ locale: 'uk', slug: 'old' }));
+    await service.update('p1', 'uk', { localizedSlug: 'hello' });
+    expect(translations.save).toHaveBeenLastCalledWith(expect.objectContaining({ slug: null }));
+    await service.update('p1', 'uk', { localizedSlug: null });
+    expect(translations.save).toHaveBeenLastCalledWith(expect.objectContaining({ slug: null }));
+  });
+
+  it("409s when another post already uses the segment as any language's slug", async () => {
+    posts.findOne.mockImplementation(async ({ where }: { where: { id?: string } }) =>
+      where.id ? makePost() : null,
+    );
+    translations.find.mockResolvedValue([makeTranslation({ postId: 'p2', slug: 'pryvit' })]);
+    await expectHttpError(
+      service.update('p1', 'uk', { localizedSlug: 'pryvit' }),
+      409,
+      'SLUG_TAKEN',
+    );
+  });
+});
+
 describe('AdminPostsService.update', () => {
   it('edits the language version and deletes replaced images nothing else uses', async () => {
     posts.findOne.mockResolvedValue(makePost());

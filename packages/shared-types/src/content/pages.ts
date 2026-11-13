@@ -172,11 +172,17 @@ export interface PageSeoDraft {
   description: LocalizedText;
   /** Comma-separated */
   keywords: LocalizedText;
-  /** OG image (`og:image`); the site's generated card when empty */
-  ogImageUrl: string | null;
+  /**
+   * OG image (`og:image`) per language: a language without its own uses the English one, then
+   * the site's generated card. Drafts saved before this was per language hold one string.
+   */
+  ogImageUrl: LocalizedImageUrl;
   /** Keep this page out of search engines even while indexing is on */
   noindex: boolean;
 }
+
+/** An image URL per language; null = none in that language. */
+export type LocalizedImageUrl = Record<Locale, string | null>;
 
 /** What an editor changes: saved as the page's content and copied into a revision (live at once). */
 export interface PageContent {

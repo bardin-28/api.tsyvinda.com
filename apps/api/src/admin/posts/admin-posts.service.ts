@@ -22,7 +22,7 @@ import { PostTranslation } from '../../modules/posts/entities/post-translation.e
 import {
   EMPTY_TRANSLATION,
   loadPostCategories,
-  loadPostLocales,
+  loadPostVersions,
   toPublicPost,
   type PostTranslationFields,
   type PublicCategory,
@@ -47,8 +47,11 @@ export interface AdminPostTranslationInput {
   coverAlt?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  keywords?: string[];
   ogImageUrl?: string | null;
   canonicalUrl?: string | null;
+  /** This language's own URL segment; null = use the shared slug */
+  localizedSlug?: string | null;
 }
 
 export type AdminPostWriteInput = AdminPostSharedInput & AdminPostTranslationInput;
@@ -67,9 +70,10 @@ const TRANSLATION_FIELDS = [
   'coverAlt',
   'seoTitle',
   'seoDescription',
+  'keywords',
   'ogImageUrl',
   'canonicalUrl',
-] as const satisfies readonly (keyof AdminPostTranslationInput)[];
+] as const satisfies readonly (keyof AdminPostTranslationInput & keyof PostTranslation)[];
 
 const SHARED_FIELDS = ['slug', 'authorId', 'status', 'publishedAt'] as const satisfies readonly (
   keyof AdminPostSharedInput | keyof Post
@@ -215,6 +219,7 @@ export class AdminPostsService {
     input: AdminCreatePostInput,
   ): Promise<AdminPostView> {
     await this.assertSlugFree(input.slug);
+    if (input.localizedSlug) await this.assertSlugFree(input.localizedSlug);
     const authorId = input.authorId ?? actorId;
     await this.assertUserExists(authorId);
 
@@ -230,6 +235,7 @@ export class AdminPostsService {
       await manager.getRepository(PostTranslation).insert({
         ...EMPTY_TRANSLATION,
         ...definedFields(input, TRANSLATION_FIELDS),
+        slug: ownSlug(input.localizedSlug, input.slug),
         postId: saved.id,
         locale,
       });
@@ -249,11 +255,18 @@ export class AdminPostsService {
     if (patch.slug !== undefined && patch.slug !== post.slug) {
       await this.assertSlugFree(patch.slug, post.id);
     }
+    if (patch.localizedSlug) await this.assertSlugFree(patch.localizedSlug, post.id);
     if (patch.authorId !== undefined && patch.authorId !== post.authorId) {
       await this.assertUserExists(patch.authorId);
     }
 
-    const translationPatch = definedFields(patch, TRANSLATION_FIELDS);
+    const translationPatch: Partial<PostTranslationFields> = definedFields(
+      patch,
+      TRANSLATION_FIELDS,
+    );
+    if (patch.localizedSlug !== undefined) {
+      translationPatch.slug = ownSlug(patch.localizedSlug, patch.slug ?? post.slug);
+    }
     const existing = await this.translations.findOne({ where: { postId: id, locale } });
     const previousImages = { imageUrl: existing?.imageUrl, ogImageUrl: existing?.ogImageUrl };
     let translation: PostTranslation | null = existing;
@@ -335,9 +348,9 @@ export class AdminPostsService {
     pick: (row: PostRow) => PostTranslationFields | null | undefined,
   ): Promise<AdminPostView[]> {
     const postIds = rows.map((post) => post.id);
-    const [categories, locales] = await Promise.all([
+    const [categories, versions] = await Promise.all([
       loadPostCategories(this.ds.manager, postIds, locale),
-      loadPostLocales(this.ds.manager, postIds),
+      loadPostVersions(this.ds.manager, postIds),
     ]);
     return rows.map((post) =>
       toAdminPost(
@@ -345,7 +358,7 @@ export class AdminPostsService {
         post.author,
         {
           locale,
-          locales: locales.get(post.id) ?? [],
+          versions: versions.get(post.id) ?? [],
           translation: pick(post) ?? EMPTY_TRANSLATION,
         },
         categories.get(post.id) ?? [],
@@ -358,9 +371,20 @@ export class AdminPostsService {
     await this.media.deleteIfUnused(urls);
   }
 
+  /**
+   * A URL segment may belong to one post only — shared or any language's own — so an address
+   * never resolves to two posts.
+   */
   private async assertSlugFree(slug: string, ownId?: string): Promise<void> {
-    const taken = await this.posts.findOne({ where: { slug } });
-    if (taken && taken.id !== ownId) {
+    const [sharedOwner, ownSlugHolders] = await Promise.all([
+      this.posts.findOne({ where: { slug } }),
+      this.translations.find({ where: { slug } }),
+    ]);
+    const ownerIds = [
+      ...(sharedOwner ? [sharedOwner.id] : []),
+      ...(ownSlugHolders ?? []).map((translation) => translation.postId),
+    ];
+    if (ownerIds.some((postId) => postId !== ownId)) {
       throw new HttpError(409, 'SLUG_TAKEN', 'Slug already in use');
     }
   }
@@ -383,6 +407,11 @@ function definedFields<Input extends object, Field extends keyof Input>(
     if (input[field] !== undefined) picked[field] = input[field];
   }
   return picked;
+}
+
+/** A language's own URL segment; empty or equal to the shared slug → null (use the shared one). */
+function ownSlug(localizedSlug: string | null | undefined, sharedSlug: string): string | null {
+  return localizedSlug && localizedSlug !== sharedSlug ? localizedSlug : null;
 }
 
 /** Publishing without a "date shown" stamps it now; unpublishing keeps the date. */

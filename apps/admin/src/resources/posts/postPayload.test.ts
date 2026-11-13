@@ -23,7 +23,21 @@ describe('toPostPayload', () => {
       publishedAt: '',
       seoTitle: '',
       seoDescription: '',
+      keywords: [],
+      localizedSlug: '',
       canonicalUrl: '',
+    });
+  });
+
+  it("sends keywords as a clean list and this language's own URL", () => {
+    expect(
+      toPostPayload(
+        { ...base, keywords: ' Next.js, , security ,API ', localizedSlug: 'pryvit' },
+        none,
+      ),
+    ).toMatchObject({ keywords: ['Next.js', 'security', 'API'], localizedSlug: 'pryvit' });
+    expect(toPostPayload({ ...base, keywords: ['React'] }, none)).toMatchObject({
+      keywords: ['React'],
     });
   });
 

@@ -8,6 +8,9 @@ import {
   missingRequired,
   normalizeEnabledLocales,
   normalizePageContent,
+  ogImageFor,
+  pageImageUrls,
+  readOgImageUrls,
 } from './page-content';
 
 function fieldErrorsOf(run: () => unknown): Record<string, string> {
@@ -98,11 +101,40 @@ describe('normalizePageContent', () => {
     ]);
   });
 
-  it('accepts only https share images', () => {
+  it('accepts only https share images, per language', () => {
     const errors = fieldErrorsOf(() =>
-      normalizePageContent('about', { seo: { ogImageUrl: 'http://x.dev/a.png' } }),
+      normalizePageContent('about', {
+        seo: { ogImageUrl: { en: 'https://x.dev/a.png', uk: 'http://x.dev/b.png' } },
+      }),
     );
-    expect(errors).toEqual({ 'draft.seo.ogImageUrl': 'Must be an https URL' });
+    expect(errors).toEqual({ 'draft.seo.ogImageUrl.uk': 'Must be an https URL' });
+  });
+
+  it('keeps one share image per language and reads a legacy single URL as every language', () => {
+    expect(
+      normalizePageContent('about', { seo: { ogImageUrl: { uk: 'https://x.dev/uk.png' } } }).seo
+        .ogImageUrl,
+    ).toEqual({ en: null, uk: 'https://x.dev/uk.png' });
+    expect(readOgImageUrls('https://x.dev/old.png')).toEqual({
+      en: 'https://x.dev/old.png',
+      uk: 'https://x.dev/old.png',
+    });
+  });
+
+  it('shows a language its own share image, else the English one', () => {
+    const urls = { en: 'https://x.dev/en.png', uk: null };
+    expect(ogImageFor(urls, 'uk')).toBe('https://x.dev/en.png');
+    expect(ogImageFor({ en: null, uk: 'https://x.dev/uk.png' }, 'uk')).toBe('https://x.dev/uk.png');
+    expect(ogImageFor({ en: null, uk: 'https://x.dev/uk.png' }, 'en')).toBeNull();
+    expect(
+      pageImageUrls({
+        ...emptyPageContent(),
+        seo: {
+          ...emptyPageContent().seo,
+          ogImageUrl: { en: 'https://x.dev/en.png', uk: 'https://x.dev/uk.png' },
+        },
+      }),
+    ).toEqual(['https://x.dev/en.png', 'https://x.dev/uk.png']);
   });
 });
 

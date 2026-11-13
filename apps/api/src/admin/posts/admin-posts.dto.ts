@@ -105,6 +105,43 @@ const toIdArray = ({ value }: TransformFnParams): unknown => {
   }
 };
 
+/**
+ * Keywords arrive as an array (JSON body), a JSON-encoded array or a comma-separated string
+ * (multipart). Trimmed, blanks and repeats (case-insensitive) dropped.
+ */
+const toKeywordList = ({ value }: TransformFnParams): unknown => {
+  let list: unknown = value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        list = JSON.parse(trimmed) as unknown;
+      } catch {
+        return value;
+      }
+    } else {
+      list = trimmed === '' ? [] : trimmed.split(',');
+    }
+  }
+  if (!Array.isArray(list)) return value;
+  const seen = new Set<string>();
+  const keywords: unknown[] = [];
+  for (const item of list) {
+    if (typeof item !== 'string') {
+      keywords.push(item);
+      continue;
+    }
+    const keyword = item.trim().replace(/\s+/g, ' ');
+    if (!keyword || seen.has(keyword.toLowerCase())) continue;
+    seen.add(keyword.toLowerCase());
+    keywords.push(keyword);
+  }
+  return keywords;
+};
+
+const MAX_KEYWORDS = 20;
+const MAX_KEYWORD_LENGTH = 60;
+
 /** Publishing, author, categories and SEO fields shared by admin create and update. */
 export class AdminPostMetaDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'Any user; omitted on create = you' })
@@ -165,6 +202,34 @@ export class AdminPostMetaDto {
   @IsString()
   @MaxLength(500)
   seoDescription?: string | null;
+
+  @ApiPropertyOptional({
+    type: [String],
+    maxItems: MAX_KEYWORDS,
+    description:
+      'Search keywords of this language version (array, or comma-separated in multipart). [] or "" clears.',
+  })
+  @IsOptional()
+  @Transform(toKeywordList)
+  @IsArray()
+  @ArrayMaxSize(MAX_KEYWORDS)
+  @IsString({ each: true })
+  @MaxLength(MAX_KEYWORD_LENGTH, { each: true })
+  keywords?: string[];
+
+  @ApiPropertyOptional({
+    maxLength: 200,
+    nullable: true,
+    pattern: SLUG_REGEX.source,
+    description:
+      "This language's own URL segment, e.g. a transliterated title. Empty: the shared slug.",
+  })
+  @IsOptional()
+  @Transform(blankToNull)
+  @IsString()
+  @Length(1, 200)
+  @Matches(SLUG_REGEX, { message: SLUG_MESSAGE })
+  localizedSlug?: string | null;
 
   @ApiPropertyOptional({
     maxLength: 1024,

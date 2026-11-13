@@ -20,6 +20,10 @@ export interface PostFormValues {
   publishedAt?: string | Date | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  /** List as stored, or the comma-separated line being edited */
+  keywords?: string[] | string | null;
+  /** This language's own URL segment; empty = the shared slug */
+  localizedSlug?: string | null;
   canonicalUrl?: string | null;
   ogImageUrl?: ImageValue;
   /** Undefined = untouched: keep whatever OG image is stored */
@@ -32,6 +36,12 @@ const isPicked = (value: ImageValue): value is { rawFile: File } =>
 /** A media-library image (its URL) other than the one already stored. */
 const isLibraryPick = (value: ImageValue, stored?: string | null): value is string =>
   typeof value === 'string' && value !== '' && value !== stored;
+
+/** Keywords as a trimmed list without blanks (the API also drops repeats). */
+export function toKeywordList(value: PostFormValues['keywords']): string[] {
+  const items = Array.isArray(value) ? value : (value ?? '').split(',');
+  return items.map((item) => item.trim()).filter(Boolean);
+}
 
 const toIsoOrEmpty = (value: PostFormValues['publishedAt']): string => {
   if (!value) return '';
@@ -59,6 +69,8 @@ export function toPostPayload(
     publishedAt: toIsoOrEmpty(values.publishedAt),
     seoTitle: values.seoTitle ?? '',
     seoDescription: values.seoDescription ?? '',
+    keywords: toKeywordList(values.keywords),
+    localizedSlug: values.localizedSlug ?? '',
     canonicalUrl: values.canonicalUrl ?? '',
   };
   if (values.authorId) payload.authorId = values.authorId;

@@ -89,6 +89,12 @@ Posts keep shared fields (slug, author, categories, status, publishedAt) in `pos
 body, cover (`imageUrl` + `coverAlt`), SEO overrides, OG image and canonical are per language in
 `post_translations` (PK `postId, locale`). Category names are in `post_category_translations`
 (slug shared). Migration `1780500000000-ContentLocales` moved existing content into `en`.
+`posts.slug` is the post's shared key (English URL segment); a language version may have its own
+URL segment `post_translations.slug` (null = shared; admin field `localizedSlug`, "From title"
+transliterates Ukrainian by the 2010 national system in `admin/.../posts/slugify.ts`) and its own
+`keywords` (text[]). A segment belongs to one post only (`assertSlugFree` checks shared + own).
+Responses carry `slugs` (segment per language); `/routes/resolve` finds a post by any of its
+segments and 308s the others to the language's own one (old `/uk/blog/<english>` URLs keep working).
 
 - Website endpoints take `?locale=` (default en): `/posts` and `/posts/:slug` return only posts
   translated into that language (404 otherwise); category names fall back to English. Responses

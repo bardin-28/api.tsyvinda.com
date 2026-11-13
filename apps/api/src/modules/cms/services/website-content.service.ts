@@ -13,6 +13,7 @@ import {
 import { HttpError } from '../../../shared/http-error';
 import { Page } from '../entities/page.entity';
 import { flattenFieldValues, type FlattenContext } from '../content/field-values';
+import { ogImageFor } from '../content/page-content';
 import type { RouteIndex } from '../content/route-index';
 import { RoutesService } from './routes.service';
 
@@ -64,7 +65,7 @@ export class WebsiteContentService {
           .split(',')
           .map((keyword) => keyword.trim())
           .filter(Boolean),
-        ogImageUrl: seo.ogImageUrl,
+        ogImageUrl: ogImageFor(seo.ogImageUrl, locale),
         noindex: seo.noindex,
       },
       blocks,

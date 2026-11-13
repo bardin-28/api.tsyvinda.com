@@ -1,10 +1,12 @@
 import {
   BLOCK_DEFINITIONS,
+  DEFAULT_LOCALE,
   LOCALES,
   PAGE_DEFINITIONS,
   type DraftBlock,
   type FieldDefinitions,
   type Locale,
+  type LocalizedImageUrl,
   type PageContent,
   type PageKey,
 } from '@tsyvinda/shared-types';
@@ -45,6 +47,36 @@ export const PAGE_SEO_FIELDS = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const MAX_IMAGE_URL_LENGTH = 1024;
+
+/** Stored OG image(s) → one URL (or null) per language; a legacy single URL serves every language. */
+export function readOgImageUrls(raw: unknown): LocalizedImageUrl {
+  const pick = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+  const shared = typeof raw === 'string' ? pick(raw) : null;
+  return Object.fromEntries(
+    LOCALES.map((locale) => [locale, isRecord(raw) ? pick(raw[locale]) : shared]),
+  ) as LocalizedImageUrl;
+}
+
+/** Sent OG images, each checked to be an https URL (`draft.seo.ogImageUrl.<locale>` errors). */
+function normalizeOgImageUrls(raw: unknown, errors: FieldErrors): LocalizedImageUrl {
+  const urls = readOgImageUrls(raw);
+  for (const locale of LOCALES) {
+    const url = urls[locale];
+    if (url && (!/^https:\/\/\S+$/.test(url) || url.length > MAX_IMAGE_URL_LENGTH)) {
+      errors[`${DRAFT}.seo.ogImageUrl.${locale}`] = 'Must be an https URL';
+    }
+  }
+  return urls;
+}
+
+/** OG image the website shows in `locale`: its own, else the English one, else none (the card). */
+export function ogImageFor(raw: unknown, locale: Locale): string | null {
+  const urls = readOgImageUrls(raw);
+  return urls[locale] ?? urls[DEFAULT_LOCALE] ?? null;
+}
+
 function validationError(errors: FieldErrors): HttpError {
   return new HttpError(400, 'VALIDATION_FAILED', 'Page content is invalid', {
     fieldErrors: errors,
@@ -66,13 +98,7 @@ export function normalizePageContent(key: PageKey, raw: unknown): PageContent {
   const meta = normalizeFieldValues(PAGE_META_FIELDS, { title: source.title }, DRAFT, errors);
   const seoTexts = normalizeFieldValues(PAGE_SEO_FIELDS, seoSource, `${DRAFT}.seo`, errors);
 
-  let ogImageUrl: string | null = null;
-  if (typeof seoSource.ogImageUrl === 'string' && seoSource.ogImageUrl.trim() !== '') {
-    ogImageUrl = seoSource.ogImageUrl.trim();
-    if (!/^https:\/\/\S+$/.test(ogImageUrl) || ogImageUrl.length > 1024) {
-      errors[`${DRAFT}.seo.ogImageUrl`] = 'Must be an https URL';
-    }
-  }
+  const ogImageUrl = normalizeOgImageUrls(seoSource.ogImageUrl, errors);
 
   if (source.blocks !== undefined && !Array.isArray(source.blocks))
     errors[`${DRAFT}.blocks`] = 'Must be a list';
@@ -153,7 +179,9 @@ export function pageImageUrls(content: PageContent): string[] {
     const def = BLOCK_DEFINITIONS[block.type];
     return def ? imageUrls(def.fields, block.data) : [];
   });
-  if (content.seo.ogImageUrl) urls.push(content.seo.ogImageUrl);
+  for (const url of Object.values(readOgImageUrls(content.seo.ogImageUrl))) {
+    if (url) urls.push(url);
+  }
   return urls;
 }
 
@@ -186,7 +214,7 @@ export function emptyPageContent(): PageContent {
       title: { ...empty },
       description: { ...empty },
       keywords: { ...empty },
-      ogImageUrl: null,
+      ogImageUrl: readOgImageUrls(null),
       noindex: false,
     },
     blocks: [],

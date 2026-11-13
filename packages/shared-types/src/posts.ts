@@ -29,7 +29,15 @@ export interface Post {
   /** Languages this post is translated into */
   locales: Locale[];
   title: string;
+  /** Shared key of the post (its English URL segment); identifies it in API calls */
   slug: string;
+  /**
+   * URL segment of this language version when it has its own (e.g. a transliterated Ukrainian
+   * title); null = the shared `slug`
+   */
+  localizedSlug: string | null;
+  /** URL segment per language the post exists in (own one, else the shared slug) */
+  slugs: Partial<Record<Locale, string>>;
   description: string | null;
   htmlContent: string;
   imageUrl: string | null;
@@ -43,6 +51,8 @@ export interface Post {
   /** Search/social overrides; null = derived (title, description, cover, own URL), per language */
   seoTitle: string | null;
   seoDescription: string | null;
+  /** Search keywords of this language version (`<meta name="keywords">`) */
+  keywords: string[];
   ogImageUrl: string | null;
   canonicalUrl: string | null;
   createdAt: string;
