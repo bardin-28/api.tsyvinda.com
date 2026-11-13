@@ -190,6 +190,24 @@ export class AdminPostMetaDto {
       'Social sharing image, ideally 1200×630 (jpeg, png, webp; max 5MB). Empty: the cover.',
   })
   ogImage?: Express.Multer.File;
+
+  @ApiPropertyOptional({
+    maxLength: 1024,
+    description: 'Cover from the media library (its URL); ignored when a new image is sent',
+  })
+  @IsOptional()
+  @IsUrl({ protocols: ['https', 'http'], require_protocol: true, require_tld: false })
+  @MaxLength(1024)
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 1024,
+    description: 'Share image from the media library (its URL); ignored when a new ogImage is sent',
+  })
+  @IsOptional()
+  @IsUrl({ protocols: ['https', 'http'], require_protocol: true, require_tld: false })
+  @MaxLength(1024)
+  ogImageUrl?: string;
 }
 
 export class AdminCreatePostDto extends IntersectionType(CreatePostDto, AdminPostMetaDto) {}

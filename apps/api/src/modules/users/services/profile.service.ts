@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { type DataSource, type Repository } from 'typeorm';
 import { HttpError } from '../../../shared/http-error';
-import { S3Service } from '../../../shared/s3/s3.service';
+import { MediaService } from '../../media/media.service';
 import { toPublicUser, type PublicUser } from '../../auth/services/auth.service';
 import { User } from '../entities/user.entity';
 
@@ -16,7 +16,7 @@ export interface UpdateProfileInput {
 export class ProfileService {
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
-    private readonly s3: S3Service,
+    private readonly media: MediaService,
   ) {}
 
   private get users(): Repository<User> {
@@ -46,7 +46,7 @@ export class ProfileService {
     await this.users.save(user);
 
     if (patch.profileImageUrl !== undefined && prevImage && prevImage !== patch.profileImageUrl) {
-      void this.s3.deleteByUrl(prevImage);
+      await this.media.deleteIfUnused([prevImage]);
     }
 
     return toPublicUser(user);
@@ -62,7 +62,7 @@ export class ProfileService {
     if (prevImage) {
       user.profileImageUrl = null;
       await this.users.save(user);
-      void this.s3.deleteByUrl(prevImage);
+      await this.media.deleteIfUnused([prevImage]);
     }
 
     return toPublicUser(user);

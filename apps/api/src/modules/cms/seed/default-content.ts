@@ -241,10 +241,6 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: 'Vladyslav Tsyvinda',
         uk: 'Владислав Цивінда',
       },
-      socialTitle: {
-        en: 'Vladyslav Tsyvinda',
-        uk: 'Владислав Цивінда',
-      },
       description: {
         en: 'Vladyslav Tsyvinda — Full-Stack Lead Developer with 6+ years building scalable React, Next.js, and TypeScript products across MedTech, FinTech, PropTech, TravelTech, and EdTech.',
         uk: 'Владислав Цивінда — Full-Stack Lead Developer із понад 6 роками досвіду створення масштабованих продуктів на React, Next.js і TypeScript у сферах MedTech, FinTech, PropTech, TravelTech та EdTech.',
@@ -400,10 +396,6 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
       title: {
         en: 'About',
         uk: 'Про мене',
-      },
-      socialTitle: {
-        en: 'About — Vladyslav Tsyvinda',
-        uk: 'Про мене — Владислав Цивінда',
       },
       description: {
         en: 'Full-Stack Lead Developer with 6+ years delivering scalable React, Next.js, and TypeScript products across MedTech, FinTech, PropTech, TravelTech, and EdTech industries.',
@@ -647,10 +639,6 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: 'Contacts',
         uk: 'Контакти',
       },
-      socialTitle: {
-        en: 'Contacts — Vladyslav Tsyvinda',
-        uk: 'Контакти — Владислав Цивінда',
-      },
       description: {
         en: 'Get in touch with Vladyslav Tsyvinda — Full-Stack Lead Developer. Reach out on LinkedIn, Telegram, or by email.',
         uk: 'Звʼяжіться з Владиславом Цивіндою — Full-Stack Lead Developer. Пишіть у LinkedIn, Telegram або на email.',
@@ -699,10 +687,6 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
       title: {
         en: 'Blog',
         uk: 'Блог',
-      },
-      socialTitle: {
-        en: 'Blog — Vladyslav Tsyvinda',
-        uk: 'Блог — Владислав Цивінда',
       },
       description: {
         en: 'Notes on frontend engineering, React, Next.js, TypeScript, and product delivery from Vladyslav Tsyvinda.',
@@ -830,10 +814,6 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
         en: 'Privacy Policy',
         uk: 'Політика конфіденційності',
       },
-      socialTitle: {
-        en: 'Privacy Policy — Vladyslav Tsyvinda',
-        uk: 'Політика конфіденційності — Владислав Цивінда',
-      },
       description: {
         en: 'How tsyvinda.com collects, uses, stores, and protects personal data, including cookies, accounts, third-party services, and contact details.',
         uk: 'Як tsyvinda.com збирає, використовує, зберігає та захищає персональні дані, зокрема файли cookie, облікові записи, сторонні сервіси й контактні дані.',
@@ -888,10 +868,6 @@ export const DEFAULT_PAGE_CONTENT: Record<PageKey, PageContent> = {
       title: {
         en: 'Cookie Policy',
         uk: 'Політика cookie',
-      },
-      socialTitle: {
-        en: 'Cookie Policy — Vladyslav Tsyvinda',
-        uk: 'Політика cookie — Владислав Цивінда',
       },
       description: {
         en: 'Which cookies and similar technologies tsyvinda.com uses, why, for how long, and how to change your cookie choice at any time.',

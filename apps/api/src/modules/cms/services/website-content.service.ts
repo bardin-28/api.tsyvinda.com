@@ -57,7 +57,8 @@ export class WebsiteContentService {
       title,
       seo: {
         title: seo.title[locale] || title,
-        socialTitle: seo.socialTitle[locale] || seo.title[locale] || title,
+        // Deprecated alias of the OG title for websites deployed before the merge
+        socialTitle: seo.title[locale] || title,
         description: seo.description[locale],
         keywords: seo.keywords[locale]
           .split(',')

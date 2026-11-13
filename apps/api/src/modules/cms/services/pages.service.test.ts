@@ -8,7 +8,7 @@ import { emptyPageContent, normalizePageContent } from '../content/page-content'
 import { PagesService, normalizeSlugs } from './pages.service';
 import type { RevalidationService } from './revalidation.service';
 import type { RoutesService } from './routes.service';
-import type { S3Service } from '../../../shared/s3/s3.service';
+import type { MediaService } from '../../media/media.service';
 
 let page: Record<string, unknown>;
 let slugRows: Record<string, unknown>[];
@@ -42,8 +42,8 @@ const manager = {
 const revalidate = vi.fn();
 const S3_BASE = 'https://cdn.example';
 const s3 = {
-  put: vi.fn(async (key: string) => `${S3_BASE}/${key}`),
-  deleteByUrl: vi.fn(async () => undefined),
+  put: vi.fn(async (key: string, _body?: Buffer, _type?: string) => `${S3_BASE}/${key}`),
+  deleteByUrl: vi.fn(async (_url?: string) => undefined),
   keyFromUrl: (url: string) =>
     url.startsWith(`${S3_BASE}/`) ? url.slice(S3_BASE.length + 1) : null,
 };
@@ -71,7 +71,14 @@ beforeEach(() => {
     ds as unknown as DataSource,
     {} as RoutesService,
     { revalidate } as unknown as RevalidationService,
-    s3 as unknown as S3Service,
+    // The library stores under `<folder>/…` and deletes what it is given (usage checks are its own)
+    {
+      storeUrl: async (file: { mimetype: string; buffer: Buffer }, folder: string) =>
+        s3.put(`${folder}/upload.${file.mimetype.split('/')[1]}`, file.buffer, file.mimetype),
+      deleteIfUnused: async (urls: string[]) => {
+        for (const url of urls) if (s3.keyFromUrl(url)) await s3.deleteByUrl(url);
+      },
+    } as unknown as MediaService,
   );
   vi.spyOn(service, 'get').mockResolvedValue({} as never);
 });
@@ -192,7 +199,7 @@ describe('PagesService.updateSlugs', () => {
 });
 
 describe('PagesService.uploadImage', () => {
-  it('stores the file under pages/ and returns its URL', async () => {
+  it('stores the file under pages/ in the media library and returns its URL', async () => {
     const result = await service.uploadImage({ buffer: Buffer.from('x'), mimetype: 'image/webp' });
     expect(s3.put).toHaveBeenCalledWith(
       expect.stringMatching(/^pages\/.+\.webp$/),

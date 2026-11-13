@@ -7,7 +7,8 @@ import type { Request } from 'express';
 import request from 'supertest';
 import { UsersController } from './users.controller';
 import { ProfileService } from './services/profile.service';
-import { S3Service } from '../../shared/s3/s3.service';
+import { MediaService } from '../media/media.service';
+import { mediaMock } from '../media/media.test-utils';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { AllExceptionsFilter } from '../../shared/all-exceptions.filter';
 import { validationExceptionFactory } from '../../shared/validation-exception.factory';
@@ -37,7 +38,7 @@ beforeAll(async () => {
     controllers: [UsersController],
     providers: [
       { provide: ProfileService, useValue: profilesMock },
-      { provide: S3Service, useValue: s3Mock },
+      { provide: MediaService, useValue: mediaMock(s3Mock) },
     ],
   })
     .overrideGuard(AuthGuard)

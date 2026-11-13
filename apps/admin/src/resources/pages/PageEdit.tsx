@@ -47,26 +47,18 @@ const SEO_FIELDS = {
   title: {
     kind: 'text',
     localized: true,
-    label: 'SEO title',
-    help: 'Browser tab and search results',
+    label: 'OG title',
+    help: 'Share cards (og:title), browser tab and search results; " — <site name>" is added',
     required: true,
     max: 120,
-    recommendedLength: { min: 30, max: 60 },
-  },
-  socialTitle: {
-    kind: 'text',
-    localized: true,
-    label: 'Social title',
-    help: 'Share cards; SEO title when empty',
-    max: 160,
     recommendedLength: { min: 30, max: 60 },
   },
   description: {
     kind: 'text',
     localized: true,
     multiline: true,
-    label: 'SEO description',
-    help: 'Search results and share cards',
+    label: 'OG description',
+    help: 'Share cards (og:description) and search results',
     required: true,
     max: 400,
     recommendedLength: { min: 70, max: 160 },
@@ -207,6 +199,11 @@ const TranslationCard: React.FC<{ page: AdminPage }> = ({ page }) => (
   </SidebarCard>
 );
 
+/** The record is the full `GET /admin/pages/:key` response, not a list row placeholder. */
+function isFullPage(page: AdminPage | undefined): page is AdminPage {
+  return Boolean(page && page.draft && page.slugs);
+}
+
 const PageTitle: React.FC = () => {
   const page = useRecordContext<AdminPage>();
   return <>{page ? `Page “${page.label}”` : 'Page'}</>;
@@ -216,7 +213,9 @@ const PageForm: React.FC = () => {
   const page = useRecordContext<AdminPage>();
   const locale = useContentLocale();
   const [tab, setTab] = useState<'content' | 'seo'>('content');
-  if (!page) return null;
+  // react-admin may first render the list row as a placeholder (it lacks draft, slugs…), e.g.
+  // right after the language switch reset the cache: wait for the full page record
+  if (!isFullPage(page)) return null;
 
   return (
     <Form>
@@ -253,13 +252,13 @@ const PageForm: React.FC = () => {
           sx={{ display: tab === 'seo' ? 'flex' : 'none', flexDirection: 'column', gap: 0.5 }}
         >
           <Typography variant="overline" component="h2" sx={{ color: 'text.secondary' }}>
-            Search engines
+            Search engines and sharing (OpenGraph)
           </Typography>
           <FieldInputs defs={SEO_FIELDS} locale={locale} base="draft.seo" />
           <ImageFieldInput
             source="draft.seo.ogImageUrl"
-            label="Social sharing image"
-            helperText="Facebook, LinkedIn, X… cards; cropped to 1200×630. The site’s generated card when empty"
+            label="OG image"
+            helperText="Share cards (og:image) on Facebook, LinkedIn, X…; cropped to 1200×630. The site’s generated card when empty"
             crop={OG_IMAGE_CROP}
           />
           <BooleanInput

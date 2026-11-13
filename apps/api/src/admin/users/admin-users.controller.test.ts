@@ -12,7 +12,8 @@ import { AdminOriginGuard } from '../guards/admin-origin.guard';
 import { AllExceptionsFilter } from '../../shared/all-exceptions.filter';
 import { validationExceptionFactory } from '../../shared/validation-exception.factory';
 import { HttpError } from '../../shared/http-error';
-import { S3Service } from '../../shared/s3/s3.service';
+import { MediaService } from '../../modules/media/media.service';
+import { mediaMock } from '../../modules/media/media.test-utils';
 
 const ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
 const user = { id: ID, email: 'grace@example.com', role: Role.USER, postCount: 0 };
@@ -40,7 +41,7 @@ beforeAll(async () => {
     controllers: [AdminUsersController],
     providers: [
       { provide: AdminUsersService, useValue: usersMock },
-      { provide: S3Service, useValue: s3Mock },
+      { provide: MediaService, useValue: mediaMock(s3Mock) },
     ],
   })
     .overrideGuard(AdminGuard)
@@ -167,6 +168,16 @@ describe('PATCH /admin/users/:id', () => {
     expect(usersMock.update).toHaveBeenCalledWith('admin-1', ID, {
       role: undefined,
       profileImageUrl: null,
+    });
+    expect(s3Mock.put).not.toHaveBeenCalled();
+  });
+
+  it('sets an avatar picked from the media library', async () => {
+    const url = 'https://cdn.example/media/pick.webp';
+    await request(app.getHttpServer()).patch(`/admin/users/${ID}`).send({ profileImageUrl: url });
+    expect(usersMock.update).toHaveBeenCalledWith('admin-1', ID, {
+      role: undefined,
+      profileImageUrl: url,
     });
     expect(s3Mock.put).not.toHaveBeenCalled();
   });

@@ -7,7 +7,7 @@ import { PostCategory } from '../../modules/posts/entities/post-category.entity'
 import { PostCategoryLink } from '../../modules/posts/entities/post-category-link.entity';
 import { PostTranslation } from '../../modules/posts/entities/post-translation.entity';
 import { User } from '../../modules/users/entities/user.entity';
-import type { S3Service } from '../../shared/s3/s3.service';
+import type { MediaService } from '../../modules/media/media.service';
 import { HttpError } from '../../shared/http-error';
 
 const author = { id: 'u1', firstName: 'Ada', lastName: 'Admin', profileImageUrl: null } as User;
@@ -140,7 +140,15 @@ beforeEach(() => {
   } as unknown as DataSource;
   service = new AdminPostsService(
     ds,
-    s3 as unknown as S3Service,
+    // MediaService decides "unused" across all content; here "used" = another post version
+    {
+      deleteIfUnused: async (urls: (string | null | undefined)[]) => {
+        for (const url of new Set(urls.filter(Boolean))) {
+          const used = await (translations.exists as unknown as () => Promise<boolean>)();
+          if (!used) await (s3.deleteByUrl as unknown as (u: string) => Promise<void>)(url!);
+        }
+      },
+    } as unknown as MediaService,
     {
       revalidate: vi.fn(),
     } as unknown as RevalidationService,

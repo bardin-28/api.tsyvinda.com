@@ -8,7 +8,7 @@ import {
   type SortOrder,
 } from '@tsyvinda/shared-types';
 import { HttpError } from '../../shared/http-error';
-import { S3Service } from '../../shared/s3/s3.service';
+import { MediaService } from '../../modules/media/media.service';
 import { User } from '../../modules/users/entities/user.entity';
 import { Post } from '../../modules/posts/entities/post.entity';
 import { toPublicUser, type PublicUser } from '../../modules/auth/services/auth.service';
@@ -38,7 +38,7 @@ export interface AdminUpdateUserInput {
 export class AdminUsersService {
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
-    private readonly s3: S3Service,
+    private readonly media: MediaService,
   ) {}
 
   private get users(): Repository<User> {
@@ -106,7 +106,7 @@ export class AdminUsersService {
 
     await this.users.save(user);
     if (patch.profileImageUrl !== undefined && prevImage && prevImage !== patch.profileImageUrl) {
-      void this.s3.deleteByUrl(prevImage);
+      await this.media.deleteIfUnused([prevImage]);
     }
     return this.getById(id);
   }
@@ -127,9 +127,7 @@ export class AdminUsersService {
     }
     const profileImageUrl = user.profileImageUrl;
     await this.users.remove(user);
-    if (profileImageUrl) {
-      void this.s3.deleteByUrl(profileImageUrl);
-    }
+    if (profileImageUrl) await this.media.deleteIfUnused([profileImageUrl]);
   }
 
   private async findOrFail(id: string): Promise<User> {

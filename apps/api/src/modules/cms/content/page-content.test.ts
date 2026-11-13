@@ -85,6 +85,19 @@ describe('normalizePageContent', () => {
     expect(content.blocks[1]!.id).not.toBe(id);
   });
 
+  it('keeps one set of OG texts: a separate social title is dropped', () => {
+    const content = normalizePageContent('about', {
+      seo: { title: { en: 'About' }, socialTitle: { en: 'About — Name' } },
+    });
+    expect(Object.keys(content.seo).sort()).toEqual([
+      'description',
+      'keywords',
+      'noindex',
+      'ogImageUrl',
+      'title',
+    ]);
+  });
+
   it('accepts only https share images', () => {
     const errors = fieldErrorsOf(() =>
       normalizePageContent('about', { seo: { ogImageUrl: 'http://x.dev/a.png' } }),

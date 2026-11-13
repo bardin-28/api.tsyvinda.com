@@ -25,11 +25,10 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { uuidv7 } from '../../shared/uuid-v7';
 import { HttpError } from '../../shared/http-error';
 import { ErrorDto } from '../../shared/swagger/error.dto';
-import { S3Service } from '../../shared/s3/s3.service';
-import { extForMime, imageUploadMemoryOptions } from '../../shared/upload-options';
+import { MediaService } from '../../modules/media/media.service';
+import { imageUploadMemoryOptions } from '../../shared/upload-options';
 import { CurrentUser, type AuthUser } from '../../modules/auth/decorators/current-user.decorator';
 import { ADMIN_ACCESS_COOKIE_NAME } from '../../modules/auth/shared/auth.utils';
 import { LOCALES, type Locale } from '@tsyvinda/shared-types';
@@ -85,7 +84,7 @@ function toMetaInput(dto: AdminPostMetaDto): AdminPostWriteInput {
 export class AdminPostsController {
   constructor(
     private readonly posts: AdminPostsService,
-    private readonly s3: S3Service,
+    private readonly media: MediaService,
   ) {}
 
   @Get()
@@ -132,8 +131,12 @@ export class AdminPostsController {
       slug: dto.slug,
       description: dto.description || null,
       htmlContent: dto.htmlContent,
-      imageUrl: coverFile ? await this.upload(coverFile) : null,
-      ogImageUrl: ogImageFile ? await this.upload(ogImageFile, 'og') : null,
+      imageUrl: coverFile
+        ? await this.upload(coverFile, user.id)
+        : await this.fromLibrary(dto.imageUrl, 'imageUrl'),
+      ogImageUrl: ogImageFile
+        ? await this.upload(ogImageFile, user.id, 'og')
+        : await this.fromLibrary(dto.ogImageUrl, 'ogImageUrl'),
     });
   }
 
@@ -153,6 +156,7 @@ export class AdminPostsController {
   @ApiResponse({ status: 409, description: 'Slug already in use', type: ErrorDto })
   @UseInterceptors(FileFieldsInterceptor(POST_IMAGE_FIELDS, imageUploadMemoryOptions(2)))
   async update(
+    @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
     @ContentLocale() locale: Locale,
     @Body() dto: AdminUpdatePostDto,
@@ -166,6 +170,8 @@ export class AdminPostsController {
       Object.values(meta).some((v) => v !== undefined) ||
       dto.removeImage ||
       dto.removeOgImage ||
+      dto.imageUrl ||
+      dto.ogImageUrl ||
       coverFile ||
       ogImageFile;
     if (!hasChange) {
@@ -178,12 +184,20 @@ export class AdminPostsController {
       slug: dto.slug,
       description: dto.description === '' ? null : dto.description,
       htmlContent: dto.htmlContent,
-      imageUrl: coverFile ? await this.upload(coverFile) : dto.removeImage ? null : undefined,
+      imageUrl: coverFile
+        ? await this.upload(coverFile, user.id)
+        : dto.imageUrl
+          ? await this.fromLibrary(dto.imageUrl, 'imageUrl')
+          : dto.removeImage
+            ? null
+            : undefined,
       ogImageUrl: ogImageFile
-        ? await this.upload(ogImageFile, 'og')
-        : dto.removeOgImage
-          ? null
-          : undefined,
+        ? await this.upload(ogImageFile, user.id, 'og')
+        : dto.ogImageUrl
+          ? await this.fromLibrary(dto.ogImageUrl, 'ogImageUrl')
+          : dto.removeOgImage
+            ? null
+            : undefined,
     });
   }
 
@@ -208,13 +222,19 @@ export class AdminPostsController {
     await this.posts.removeTranslation(id, locale);
   }
 
-  /** Covers go to `posts/`, social images to `posts/og/`. */
-  private upload(file: Express.Multer.File, kind: 'cover' | 'og' = 'cover'): Promise<string> {
-    const folder = kind === 'og' ? 'posts/og' : 'posts';
-    return this.s3.put(
-      `${folder}/${uuidv7()}.${extForMime(file.mimetype)}`,
-      file.buffer,
-      file.mimetype,
-    );
+  /** Covers go to `posts/`, social images to `posts/og/`; both join the media library. */
+  private upload(
+    file: Express.Multer.File,
+    userId: string,
+    kind: 'cover' | 'og' = 'cover',
+  ): Promise<string> {
+    return this.media.storeUrl(file, kind === 'og' ? 'posts/og' : 'posts', userId);
+  }
+
+  /** An image picked from the media library (null when none was picked). */
+  private async fromLibrary(url: string | undefined, field: string): Promise<string | null> {
+    if (!url) return null;
+    await this.media.assertInLibrary(url, field);
+    return url;
   }
 }

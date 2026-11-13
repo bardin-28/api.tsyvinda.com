@@ -21,6 +21,13 @@ export function toUserPayload(
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = { role: values.role };
   if (isPicked(values.profileImageUrl)) payload.image = values.profileImageUrl;
-  else if (!values.profileImageUrl && previous?.profileImageUrl) payload.removeImage = true;
+  else if (
+    typeof values.profileImageUrl === 'string' &&
+    values.profileImageUrl !== '' &&
+    values.profileImageUrl !== previous?.profileImageUrl
+  ) {
+    // Picked from the media library
+    payload.profileImageUrl = values.profileImageUrl;
+  } else if (!values.profileImageUrl && previous?.profileImageUrl) payload.removeImage = true;
   return payload;
 }

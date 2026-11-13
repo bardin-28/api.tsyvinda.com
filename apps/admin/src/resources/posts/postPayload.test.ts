@@ -101,4 +101,17 @@ describe('toPostPayload', () => {
     expect(unchanged).not.toHaveProperty('removeImage');
     expect(unchanged).not.toHaveProperty('image');
   });
+
+  it('sends images picked from the media library as their URL', () => {
+    const previous = { imageUrl: 'https://cdn/a.png', ogImageUrl: null };
+    const payload = toPostPayload(
+      { ...base, imageUrl: 'https://cdn/media/b.webp', ogImageUrl: 'https://cdn/media/og.webp' },
+      previous,
+    );
+    expect(payload).toMatchObject({
+      imageUrl: 'https://cdn/media/b.webp',
+      ogImageUrl: 'https://cdn/media/og.webp',
+    });
+    expect(payload).not.toHaveProperty('removeImage');
+  });
 });

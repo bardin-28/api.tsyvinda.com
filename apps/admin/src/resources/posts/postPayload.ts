@@ -29,6 +29,10 @@ export interface PostFormValues {
 const isPicked = (value: ImageValue): value is { rawFile: File } =>
   typeof value === 'object' && value !== null && value.rawFile instanceof File;
 
+/** A media-library image (its URL) other than the one already stored. */
+const isLibraryPick = (value: ImageValue, stored?: string | null): value is string =>
+  typeof value === 'string' && value !== '' && value !== stored;
+
 const toIsoOrEmpty = (value: PostFormValues['publishedAt']): string => {
   if (!value) return '';
   const date = value instanceof Date ? value : new Date(value);
@@ -60,6 +64,7 @@ export function toPostPayload(
   if (values.authorId) payload.authorId = values.authorId;
 
   if (isPicked(values.imageUrl)) payload.image = values.imageUrl;
+  else if (isLibraryPick(values.imageUrl, previous?.imageUrl)) payload.imageUrl = values.imageUrl;
   else if (!values.imageUrl && previous?.imageUrl) payload.removeImage = true;
 
   if (values.useCoverAsOgImage === true) {
@@ -67,6 +72,8 @@ export function toPostPayload(
     if (previous?.ogImageUrl) payload.removeOgImage = true;
   } else if (isPicked(values.ogImageUrl)) {
     payload.ogImage = values.ogImageUrl;
+  } else if (isLibraryPick(values.ogImageUrl, previous?.ogImageUrl)) {
+    payload.ogImageUrl = values.ogImageUrl;
   } else if (!values.ogImageUrl && previous?.ogImageUrl) {
     payload.removeOgImage = true;
   }
